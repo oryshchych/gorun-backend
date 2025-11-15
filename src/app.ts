@@ -1,0 +1,96 @@
+import express, { Application, Request, Response, NextFunction } from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import { corsConfig } from './config/env';
+import { logger } from './config/logger';
+import { apiLimiter, authLimiter } from './middleware/rateLimiter.middleware';
+import { errorHandler } from './middleware/error.middleware';
+import { notFoundHandler } from './middleware/notFound.middleware';
+import authRoutes from './routes/auth.routes';
+import eventsRoutes from './routes/events.routes';
+import registrationsRoutes from './routes/registrations.routes';
+
+/**
+ * Request logging middleware
+ */
+const requestLogger = (req: Request, res: Response, next: NextFunction): void => {
+  const start = Date.now();
+  
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    const logMessage = `${req.method} ${req.path} ${res.statusCode} - ${duration}ms`;
+    
+    if (res.statusCode >= 400) {
+      logger.warn(logMessage, {
+        method: req.method,
+        path: req.path,
+        statusCode: res.statusCode,
+        duration,
+        ip: req.ip,
+      });
+    } else {
+      logger.info(logMessage, {
+        method: req.method,
+        path: req.path,
+        statusCode: res.statusCode,
+        duration,
+        ip: req.ip,
+      });
+    }
+  });
+  
+  next();
+};
+
+/**
+ * Create and configure Express application
+ */
+const createApp = (): Application => {
+  const app = express();
+
+  // Apply CORS middleware with configured origin
+  app.use(cors({
+    origin: corsConfig.origin,
+    credentials: true,
+  }));
+
+  // Apply Helmet middleware for security headers
+  app.use(helmet());
+
+  // Apply JSON body parser
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+
+  // Apply request logging middleware
+  app.use(requestLogger);
+
+  // Health check endpoint
+  app.get('/api/health', (req: Request, res: Response) => {
+    res.status(200).json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+    });
+  });
+
+  // Apply rate limiters and mount routes
+  // Auth routes with stricter rate limiting
+  app.use('/api/auth', authLimiter, authRoutes);
+
+  // Events routes with general API rate limiting
+  app.use('/api/events', apiLimiter, eventsRoutes);
+
+  // Registrations routes with general API rate limiting
+  app.use('/api/registrations', apiLimiter, registrationsRoutes);
+
+  // Apply 404 handler middleware for undefined routes
+  app.use(notFoundHandler);
+
+  // Apply global error handler middleware (must be last)
+  app.use(errorHandler);
+
+  return app;
+};
+
+// Export app instance
+export default createApp();

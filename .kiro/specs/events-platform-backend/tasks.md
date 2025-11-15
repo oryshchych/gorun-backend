@@ -216,8 +216,8 @@
     - Define DELETE /registrations/:id with authentication middleware
     - _Requirements: 12.1, 13.1, 14.1, 15.1_
 
-- [ ] 11. Create Express application setup
-  - [ ] 11.1 Create main app file (src/app.ts)
+- [x] 11. Create Express application setup
+  - [x] 11.1 Create main app file (src/app.ts)
     - Initialize Express app
     - Apply CORS middleware with configured origin
     - Apply Helmet middleware for security headers
@@ -232,7 +232,7 @@
     - Create health check endpoint at GET /api/health
     - Export app instance
     - _Requirements: 20.1, 20.2, 20.3_
-  - [ ] 11.2 Create server entry point (src/server.ts)
+  - [x] 11.2 Create server entry point (src/server.ts)
     - Import app and database connection
     - Connect to MongoDB
     - Start Express server on configured PORT
