@@ -1,0 +1,269 @@
+# Implementation Plan
+
+- [x] 1. Initialize project structure and configuration
+  - Initialize TypeScript Node.js project with package.json in root folder
+  - Install dependencies: express, mongoose, bcrypt, jsonwebtoken, zod, cors, helmet, express-rate-limit, dotenv, winston
+  - Install dev dependencies: typescript, ts-node, nodemon, @types packages
+  - Configure TypeScript with strict mode in tsconfig.json in root folder
+  - Create directory structure in root: src/config, src/middleware, src/models, src/routes, src/controllers, src/services, src/validators, src/utils, src/types
+  - Set up .env.example in root folder with all required environment variables
+  - Create npm scripts for dev, build, start in package.json
+  - _Requirements: All requirements depend on proper project setup_
+
+- [ ] 2. Configure core infrastructure
+  - [ ] 2.1 Create environment configuration module (src/config/env.ts)
+    - Load and validate environment variables using dotenv
+    - Export typed configuration object with PORT, MONGODB_URI, JWT secrets, CORS_ORIGIN
+    - _Requirements: All requirements depend on configuration_
+  - [ ] 2.2 Create database connection module (src/config/database.ts)
+    - Implement MongoDB connection using Mongoose
+    - Configure connection options and error handling
+    - Export connection function
+    - _Requirements: All requirements depend on database connectivity_
+  - [ ] 2.3 Create logger configuration (src/config/logger.ts)
+    - Configure Winston logger with appropriate transports
+    - Set up different log levels for development and production
+    - Export logger instance
+    - _Requirements: 19.6_
+
+- [ ] 3. Implement database models
+  - [ ] 3.1 Create User model (src/models/User.ts)
+    - Define IUser interface with all fields
+    - Create Mongoose schema with validation rules
+    - Add unique index on email and compound index on provider+providerId
+    - Implement comparePassword instance method
+    - Add pre-save hook to hash password using bcrypt
+    - Configure toJSON to exclude password field
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 18.1, 20.5_
+  - [ ] 3.2 Create Event model (src/models/Event.ts)
+    - Define IEvent interface with all fields
+    - Create Mongoose schema with validation rules
+    - Add indexes on organizerId, date, location
+    - Create text index on title and description for search
+    - Add virtual for organizer population
+    - Implement hasAvailableCapacity method
+    - _Requirements: 6.1, 6.2, 7.1, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7_
+  - [ ] 3.3 Create Registration model (src/models/Registration.ts)
+    - Define IRegistration interface with all fields
+    - Create Mongoose schema with validation rules
+    - Add compound unique index on eventId+userId
+    - Add individual indexes on eventId, userId, status
+    - Add virtuals for event and user population
+    - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 13.1, 13.2, 13.3_
+  - [ ] 3.4 Create RefreshToken model (src/models/RefreshToken.ts)
+    - Define IRefreshToken interface with all fields
+    - Create Mongoose schema with validation rules
+    - Add unique index on token and index on userId
+    - Configure TTL index on expiresAt for automatic cleanup
+    - Implement cleanupExpired static method
+    - _Requirements: 2.4, 3.1, 3.2, 3.4, 4.2_
+
+- [ ] 4. Implement utility functions
+  - [ ] 4.1 Create JWT utilities (src/utils/jwt.util.ts)
+    - Implement generateAccessToken function with 15m expiry
+    - Implement generateRefreshToken function with 7d expiry
+    - Implement verifyAccessToken function with error handling
+    - Implement verifyRefreshToken function with error handling
+    - _Requirements: 1.5, 2.2, 3.1, 3.2, 5.1_
+  - [ ] 4.2 Create password utilities (src/utils/password.util.ts)
+    - Implement hashPassword function using bcrypt with 10 salt rounds
+    - Implement comparePassword function using bcrypt
+    - _Requirements: 2.1, 18.1, 18.2_
+  - [ ] 4.3 Create pagination utilities (src/utils/pagination.util.ts)
+    - Implement getPaginationParams function to validate and calculate skip/limit
+    - Implement formatPaginatedResponse function for consistent response format
+    - Set default limit to 10 and maximum to 100
+    - _Requirements: 6.1, 11.2, 14.2_
+  - [ ] 4.4 Create async handler utility (src/utils/asyncHandler.ts)
+    - Implement wrapper function to catch async errors in route handlers
+    - _Requirements: 19.1, 19.2, 19.3, 19.4, 19.5, 19.6_
+
+- [ ] 5. Implement error handling system
+  - [ ] 5.1 Create custom error classes (src/types/errors.ts)
+    - Implement AppError base class with statusCode and isOperational
+    - Implement ValidationError class for 400 errors with field-level details
+    - Implement UnauthorizedError class for 401 errors
+    - Implement ForbiddenError class for 403 errors
+    - Implement NotFoundError class for 404 errors
+    - Implement ConflictError class for 409 errors
+    - _Requirements: 19.1, 19.2, 19.3, 19.4, 19.5_
+  - [ ] 5.2 Create error handling middleware (src/middleware/error.middleware.ts)
+    - Implement global error handler that formats errors consistently
+    - Handle Mongoose validation errors
+    - Handle JWT errors
+    - Handle duplicate key errors
+    - Log errors using Winston
+    - Hide stack traces in production
+    - _Requirements: 19.1, 19.2, 19.3, 19.4, 19.5, 19.6_
+  - [ ] 5.3 Create 404 handler middleware (src/middleware/notFound.middleware.ts)
+    - Implement middleware to handle undefined routes
+    - _Requirements: 19.4_
+
+- [ ] 6. Implement validation system
+  - [ ] 6.1 Create validation middleware (src/middleware/validation.middleware.ts)
+    - Implement validate function that accepts Zod schema
+    - Support validation of body, query, and params
+    - Return formatted validation errors
+    - _Requirements: 1.2, 1.3, 1.4, 8.2, 8.3, 8.4, 8.5, 8.6, 19.1, 20.4_
+  - [ ] 6.2 Create auth validators (src/validators/auth.validator.ts)
+    - Create registerSchema: name (2-50 chars), email (valid format), password (8-100 chars)
+    - Create loginSchema: email, password
+    - Create refreshTokenSchema: refreshToken (required)
+    - _Requirements: 1.2, 1.3, 1.4, 2.1_
+  - [ ] 6.3 Create event validators (src/validators/events.validator.ts)
+    - Create createEventSchema: title (3-100), description (10-2000), date (future), location (3-200), capacity (1-10000), imageUrl (optional URL)
+    - Create updateEventSchema: all fields optional with same validation rules
+    - Create eventIdSchema: valid MongoDB ObjectId
+    - Create getEventsQuerySchema: page, limit, search, startDate, endDate, location
+    - _Requirements: 6.1, 6.2, 6.3, 6.4, 8.2, 8.3, 8.4, 8.5, 8.6_
+  - [ ] 6.4 Create registration validators (src/validators/registrations.validator.ts)
+    - Create createRegistrationSchema: eventId (valid ObjectId)
+    - Create registrationIdSchema: valid MongoDB ObjectId
+    - Create getRegistrationsQuerySchema: page, limit, eventId, status
+    - _Requirements: 12.1, 14.1_
+
+- [ ] 7. Implement authentication system
+  - [ ] 7.1 Create authentication middleware (src/middleware/auth.middleware.ts)
+    - Implement authenticate middleware to verify JWT access token
+    - Extract token from Authorization header (Bearer scheme)
+    - Verify token and extract userId
+    - Attach userId to req.user
+    - Handle expired and invalid tokens with appropriate errors
+    - _Requirements: 5.1, 5.3_
+  - [ ] 7.2 Create auth service (src/services/auth.service.ts)
+    - Implement register method: create user, hash password, generate tokens, store refresh token
+    - Implement login method: verify credentials, generate tokens, store refresh token
+    - Implement refreshAccessToken method: verify refresh token, generate new tokens, invalidate old token
+    - Implement logout method: remove refresh token from database
+    - Implement getCurrentUser method: retrieve user by ID
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.4, 4.1, 4.2, 5.1, 5.2_
+  - [ ] 7.3 Create auth controller (src/controllers/auth.controller.ts)
+    - Implement register handler: validate input, call service, return 201 with user and tokens
+    - Implement login handler: validate input, call service, return 200 with user and tokens
+    - Implement refresh handler: validate input, call service, return 200 with new tokens
+    - Implement logout handler: validate input, call service, return 200 with success message
+    - Implement me handler: call service with userId from token, return 200 with user data
+    - _Requirements: 1.1, 1.5, 2.1, 2.2, 3.1, 3.2, 4.1, 4.2, 5.1, 5.2_
+  - [ ] 7.4 Create auth routes (src/routes/auth.routes.ts)
+    - Define POST /register with validation middleware
+    - Define POST /login with validation middleware
+    - Define POST /refresh with validation middleware
+    - Define POST /logout with authentication and validation middleware
+    - Define GET /me with authentication middleware
+    - _Requirements: 1.1, 2.1, 3.1, 4.1, 5.1_
+
+- [ ] 8. Implement rate limiting
+  - [ ] 8.1 Create rate limiter middleware (src/middleware/rateLimiter.middleware.ts)
+    - Create authLimiter: 5 requests per 15 minutes for auth endpoints
+    - Create apiLimiter: 100 requests per 15 minutes for general API
+    - Use express-rate-limit with appropriate configuration
+    - _Requirements: 2.5, 17.1, 17.2_
+
+- [ ] 9. Implement event management system
+  - [ ] 9.1 Create authorization middleware (src/middleware/authorization.middleware.ts)
+    - Implement isEventOrganizer middleware to verify user is event organizer
+    - Load event and check organizerId matches authenticated userId
+    - Return 403 if not authorized
+    - _Requirements: 9.1, 9.2, 10.1, 15.1, 15.2_
+  - [ ] 9.2 Create events service (src/services/events.service.ts)
+    - Implement getEvents method: apply filters (search, date range, location), paginate, populate organizer
+    - Implement getEventById method: find by ID, populate organizer, throw NotFoundError if not exists
+    - Implement createEvent method: validate date is future, create event with userId as organizerId
+    - Implement updateEvent method: check ownership, validate updates, update event
+    - Implement deleteEvent method: check ownership, check for confirmed registrations, delete if none exist
+    - Implement getMyEvents method: filter by organizerId, paginate, populate organizer
+    - Implement checkUserRegistration method: query for confirmed registration
+    - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 7.1, 7.2, 7.3, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 9.1, 9.2, 9.3, 9.4, 10.1, 10.2, 10.3, 11.1, 11.2, 11.3, 16.1, 16.2, 16.3_
+  - [ ] 9.3 Create events controller (src/controllers/events.controller.ts)
+    - Implement getEvents handler: extract filters and pagination from query, call service
+    - Implement getEventById handler: extract ID from params, call service
+    - Implement createEvent handler: extract userId from token, validate body, call service, return 201
+    - Implement updateEvent handler: extract ID and userId, validate body, call service
+    - Implement deleteEvent handler: extract ID and userId, call service, return 204
+    - Implement getMyEvents handler: extract userId, extract pagination from query, call service
+    - Implement checkRegistration handler: extract eventId and userId, call service
+    - _Requirements: 6.1, 7.1, 8.1, 9.1, 10.1, 11.1, 16.1_
+  - [ ] 9.4 Create events routes (src/routes/events.routes.ts)
+    - Define GET /events with validation middleware (public)
+    - Define GET /events/:id with validation middleware (public)
+    - Define POST /events with authentication and validation middleware
+    - Define PUT /events/:id with authentication, authorization, and validation middleware
+    - Define DELETE /events/:id with authentication and authorization middleware
+    - Define GET /events/my with authentication and validation middleware
+    - Define GET /events/:id/check-registration with authentication and validation middleware
+    - _Requirements: 6.1, 7.1, 8.1, 9.1, 10.1, 11.1, 16.1_
+
+- [ ] 10. Implement registration system
+  - [ ] 10.1 Create registrations service (src/services/registrations.service.ts)
+    - Implement createRegistration method: verify event exists and is future, check not already registered, check capacity, create registration and increment registeredCount in transaction
+    - Implement cancelRegistration method: verify ownership, update status to cancelled and decrement registeredCount in transaction
+    - Implement getRegistrations method: apply filters, paginate, populate event and user
+    - Implement getMyRegistrations method: filter by userId, paginate, populate event and user
+    - Implement getEventRegistrations method: verify user is organizer, filter by eventId, paginate, populate user
+    - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 13.1, 13.2, 13.3, 14.1, 14.2, 14.3, 15.1, 15.2, 15.3_
+  - [ ] 10.2 Create registrations controller (src/controllers/registrations.controller.ts)
+    - Implement getRegistrations handler: extract filters and pagination from query, call service
+    - Implement getMyRegistrations handler: extract userId, extract pagination from query, call service
+    - Implement getEventRegistrations handler: extract eventId and userId, extract pagination from query, call service
+    - Implement createRegistration handler: extract userId, validate body, call service, return 201
+    - Implement cancelRegistration handler: extract ID and userId, call service, return 204
+    - _Requirements: 12.1, 13.1, 14.1, 15.1_
+  - [ ] 10.3 Create registrations routes (src/routes/registrations.routes.ts)
+    - Define GET /registrations with authentication and validation middleware
+    - Define GET /registrations/my with authentication and validation middleware
+    - Define GET /events/:eventId/registrations with authentication and validation middleware
+    - Define POST /registrations with authentication and validation middleware
+    - Define DELETE /registrations/:id with authentication middleware
+    - _Requirements: 12.1, 13.1, 14.1, 15.1_
+
+- [ ] 11. Create Express application setup
+  - [ ] 11.1 Create main app file (src/app.ts)
+    - Initialize Express app
+    - Apply CORS middleware with configured origin
+    - Apply Helmet middleware for security headers
+    - Apply JSON body parser
+    - Apply request logging middleware
+    - Apply rate limiters to appropriate routes
+    - Mount auth routes at /api/auth
+    - Mount events routes at /api/events
+    - Mount registrations routes at /api/registrations
+    - Apply 404 handler middleware
+    - Apply global error handler middleware
+    - Create health check endpoint at GET /api/health
+    - Export app instance
+    - _Requirements: 20.1, 20.2, 20.3_
+  - [ ] 11.2 Create server entry point (src/server.ts)
+    - Import app and database connection
+    - Connect to MongoDB
+    - Start Express server on configured PORT
+    - Handle graceful shutdown
+    - _Requirements: All requirements depend on server running_
+
+- [ ] 12. Create configuration files
+  - [ ] 12.1 Create .env.example file
+    - Document all required environment variables with example values
+    - Include NODE_ENV, PORT, MONGODB_URI, JWT secrets, CORS_ORIGIN, rate limit settings
+    - _Requirements: All requirements depend on proper configuration_
+  - [ ] 12.2 Create .gitignore file
+    - Exclude node_modules, .env, dist, logs, coverage
+    - _Requirements: Security best practice_
+  - [ ] 12.3 Update package.json scripts
+    - Add dev script: nodemon with ts-node
+    - Add build script: tsc
+    - Add start script: node dist/server.js
+    - _Requirements: Development and deployment workflow_
+
+- [ ] 13. Create API documentation
+  - [ ] 13.1 Create Swagger configuration (src/config/swagger.ts)
+    - Configure Swagger/OpenAPI specification
+    - Document all endpoints with request/response schemas
+    - Include authentication documentation
+    - Add example requests and responses
+    - _Requirements: Developer experience and API documentation_
+  - [ ] 13.2 Integrate Swagger UI
+    - Mount Swagger UI at /api-docs endpoint
+    - _Requirements: Developer experience and API documentation_
+
+- [ ] 14. Create README documentation
+  - Write comprehensive README.md with project overview, features, tech stack, prerequisites, installation steps, environment variables, API endpoints summary, and running instructions
+  - _Requirements: Developer onboarding and documentation_
