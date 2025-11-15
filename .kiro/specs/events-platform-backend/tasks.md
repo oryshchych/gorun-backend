@@ -122,29 +122,29 @@
     - Create getRegistrationsQuerySchema: page, limit, eventId, status
     - _Requirements: 12.1, 14.1_
 
-- [ ] 7. Implement authentication system
-  - [ ] 7.1 Create authentication middleware (src/middleware/auth.middleware.ts)
+- [x] 7. Implement authentication system
+  - [x] 7.1 Create authentication middleware (src/middleware/auth.middleware.ts)
     - Implement authenticate middleware to verify JWT access token
     - Extract token from Authorization header (Bearer scheme)
     - Verify token and extract userId
     - Attach userId to req.user
     - Handle expired and invalid tokens with appropriate errors
     - _Requirements: 5.1, 5.3_
-  - [ ] 7.2 Create auth service (src/services/auth.service.ts)
+  - [x] 7.2 Create auth service (src/services/auth.service.ts)
     - Implement register method: create user, hash password, generate tokens, store refresh token
     - Implement login method: verify credentials, generate tokens, store refresh token
     - Implement refreshAccessToken method: verify refresh token, generate new tokens, invalidate old token
     - Implement logout method: remove refresh token from database
     - Implement getCurrentUser method: retrieve user by ID
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.4, 4.1, 4.2, 5.1, 5.2_
-  - [ ] 7.3 Create auth controller (src/controllers/auth.controller.ts)
+  - [x] 7.3 Create auth controller (src/controllers/auth.controller.ts)
     - Implement register handler: validate input, call service, return 201 with user and tokens
     - Implement login handler: validate input, call service, return 200 with user and tokens
     - Implement refresh handler: validate input, call service, return 200 with new tokens
     - Implement logout handler: validate input, call service, return 200 with success message
     - Implement me handler: call service with userId from token, return 200 with user data
     - _Requirements: 1.1, 1.5, 2.1, 2.2, 3.1, 3.2, 4.1, 4.2, 5.1, 5.2_
-  - [ ] 7.4 Create auth routes (src/routes/auth.routes.ts)
+  - [x] 7.4 Create auth routes (src/routes/auth.routes.ts)
     - Define POST /register with validation middleware
     - Define POST /login with validation middleware
     - Define POST /refresh with validation middleware
