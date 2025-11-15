@@ -26,8 +26,8 @@
     - Export logger instance
     - _Requirements: 19.6_
 
-- [ ] 3. Implement database models
-  - [ ] 3.1 Create User model (src/models/User.ts)
+- [x] 3. Implement database models
+  - [x] 3.1 Create User model (src/models/User.ts)
     - Define IUser interface with all fields
     - Create Mongoose schema with validation rules
     - Add unique index on email and compound index on provider+providerId
@@ -35,7 +35,7 @@
     - Add pre-save hook to hash password using bcrypt
     - Configure toJSON to exclude password field
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 18.1, 20.5_
-  - [ ] 3.2 Create Event model (src/models/Event.ts)
+  - [x] 3.2 Create Event model (src/models/Event.ts)
     - Define IEvent interface with all fields
     - Create Mongoose schema with validation rules
     - Add indexes on organizerId, date, location
@@ -43,14 +43,14 @@
     - Add virtual for organizer population
     - Implement hasAvailableCapacity method
     - _Requirements: 6.1, 6.2, 7.1, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7_
-  - [ ] 3.3 Create Registration model (src/models/Registration.ts)
+  - [x] 3.3 Create Registration model (src/models/Registration.ts)
     - Define IRegistration interface with all fields
     - Create Mongoose schema with validation rules
     - Add compound unique index on eventId+userId
     - Add individual indexes on eventId, userId, status
     - Add virtuals for event and user population
     - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 13.1, 13.2, 13.3_
-  - [ ] 3.4 Create RefreshToken model (src/models/RefreshToken.ts)
+  - [x] 3.4 Create RefreshToken model (src/models/RefreshToken.ts)
     - Define IRefreshToken interface with all fields
     - Create Mongoose schema with validation rules
     - Add unique index on token and index on userId
