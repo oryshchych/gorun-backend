@@ -159,13 +159,13 @@
     - Use express-rate-limit with appropriate configuration
     - _Requirements: 2.5, 17.1, 17.2_
 
-- [ ] 9. Implement event management system
-  - [ ] 9.1 Create authorization middleware (src/middleware/authorization.middleware.ts)
+- [x] 9. Implement event management system
+  - [x] 9.1 Create authorization middleware (src/middleware/authorization.middleware.ts)
     - Implement isEventOrganizer middleware to verify user is event organizer
     - Load event and check organizerId matches authenticated userId
     - Return 403 if not authorized
     - _Requirements: 9.1, 9.2, 10.1, 15.1, 15.2_
-  - [ ] 9.2 Create events service (src/services/events.service.ts)
+  - [x] 9.2 Create events service (src/services/events.service.ts)
     - Implement getEvents method: apply filters (search, date range, location), paginate, populate organizer
     - Implement getEventById method: find by ID, populate organizer, throw NotFoundError if not exists
     - Implement createEvent method: validate date is future, create event with userId as organizerId
@@ -174,7 +174,7 @@
     - Implement getMyEvents method: filter by organizerId, paginate, populate organizer
     - Implement checkUserRegistration method: query for confirmed registration
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 7.1, 7.2, 7.3, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 9.1, 9.2, 9.3, 9.4, 10.1, 10.2, 10.3, 11.1, 11.2, 11.3, 16.1, 16.2, 16.3_
-  - [ ] 9.3 Create events controller (src/controllers/events.controller.ts)
+  - [x] 9.3 Create events controller (src/controllers/events.controller.ts)
     - Implement getEvents handler: extract filters and pagination from query, call service
     - Implement getEventById handler: extract ID from params, call service
     - Implement createEvent handler: extract userId from token, validate body, call service, return 201
@@ -183,7 +183,7 @@
     - Implement getMyEvents handler: extract userId, extract pagination from query, call service
     - Implement checkRegistration handler: extract eventId and userId, call service
     - _Requirements: 6.1, 7.1, 8.1, 9.1, 10.1, 11.1, 16.1_
-  - [ ] 9.4 Create events routes (src/routes/events.routes.ts)
+  - [x] 9.4 Create events routes (src/routes/events.routes.ts)
     - Define GET /events with validation middleware (public)
     - Define GET /events/:id with validation middleware (public)
     - Define POST /events with authentication and validation middleware
