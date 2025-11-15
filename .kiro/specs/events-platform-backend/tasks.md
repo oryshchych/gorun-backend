@@ -264,6 +264,6 @@
     - Mount Swagger UI at /api-docs endpoint
     - _Requirements: Developer experience and API documentation_
 
-- [ ] 14. Create README documentation
+- [x] 14. Create README documentation
   - Write comprehensive README.md with project overview, features, tech stack, prerequisites, installation steps, environment variables, API endpoints summary, and running instructions
   - _Requirements: Developer onboarding and documentation_
