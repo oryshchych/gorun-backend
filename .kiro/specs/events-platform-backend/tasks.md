@@ -193,22 +193,22 @@
     - Define GET /events/:id/check-registration with authentication and validation middleware
     - _Requirements: 6.1, 7.1, 8.1, 9.1, 10.1, 11.1, 16.1_
 
-- [ ] 10. Implement registration system
-  - [ ] 10.1 Create registrations service (src/services/registrations.service.ts)
+- [x] 10. Implement registration system
+  - [x] 10.1 Create registrations service (src/services/registrations.service.ts)
     - Implement createRegistration method: verify event exists and is future, check not already registered, check capacity, create registration and increment registeredCount in transaction
     - Implement cancelRegistration method: verify ownership, update status to cancelled and decrement registeredCount in transaction
     - Implement getRegistrations method: apply filters, paginate, populate event and user
     - Implement getMyRegistrations method: filter by userId, paginate, populate event and user
     - Implement getEventRegistrations method: verify user is organizer, filter by eventId, paginate, populate user
     - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 13.1, 13.2, 13.3, 14.1, 14.2, 14.3, 15.1, 15.2, 15.3_
-  - [ ] 10.2 Create registrations controller (src/controllers/registrations.controller.ts)
+  - [x] 10.2 Create registrations controller (src/controllers/registrations.controller.ts)
     - Implement getRegistrations handler: extract filters and pagination from query, call service
     - Implement getMyRegistrations handler: extract userId, extract pagination from query, call service
     - Implement getEventRegistrations handler: extract eventId and userId, extract pagination from query, call service
     - Implement createRegistration handler: extract userId, validate body, call service, return 201
     - Implement cancelRegistration handler: extract ID and userId, call service, return 204
     - _Requirements: 12.1, 13.1, 14.1, 15.1_
-  - [ ] 10.3 Create registrations routes (src/routes/registrations.routes.ts)
+  - [x] 10.3 Create registrations routes (src/routes/registrations.routes.ts)
     - Define GET /registrations with authentication and validation middleware
     - Define GET /registrations/my with authentication and validation middleware
     - Define GET /events/:eventId/registrations with authentication and validation middleware

@@ -36,3 +36,9 @@ export const getRegistrationsQuerySchema = z.object({
     .enum(['confirmed', 'cancelled'])
     .optional()
 });
+
+export const eventIdParamSchema = z.object({
+  eventId: z
+    .string()
+    .regex(objectIdRegex, 'Invalid event ID format')
+});

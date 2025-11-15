@@ -8,6 +8,7 @@ import {
   getMyEvents,
   checkRegistration,
 } from '../controllers/events.controller';
+import { getEventRegistrations } from '../controllers/registrations.controller';
 import { authenticate } from '../middleware/auth.middleware';
 import { isEventOrganizer } from '../middleware/authorization.middleware';
 import { validate, ValidationType } from '../middleware/validation.middleware';
@@ -17,6 +18,7 @@ import {
   eventIdSchema,
   getEventsQuerySchema,
 } from '../validators/events.validator';
+import { eventIdParamSchema, getRegistrationsQuerySchema } from '../validators/registrations.validator';
 import { asyncHandler } from '../utils/asyncHandler';
 
 const router = Router();
@@ -98,6 +100,18 @@ router.get(
   authenticate,
   validate(eventIdSchema, ValidationType.PARAMS),
   asyncHandler(checkRegistration)
+);
+
+/**
+ * GET /api/events/:eventId/registrations
+ * Get registrations for a specific event (requires authentication and authorization)
+ */
+router.get(
+  '/:eventId/registrations',
+  authenticate,
+  validate(eventIdParamSchema, ValidationType.PARAMS),
+  validate(getRegistrationsQuerySchema, ValidationType.QUERY),
+  asyncHandler(getEventRegistrations)
 );
 
 export default router;
