@@ -1,8 +1,10 @@
 import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import swaggerUi from 'swagger-ui-express';
 import { corsConfig } from './config/env';
 import { logger } from './config/logger';
+import { swaggerSpec } from './config/swagger';
 import { apiLimiter, authLimiter } from './middleware/rateLimiter.middleware';
 import { errorHandler } from './middleware/error.middleware';
 import { notFoundHandler } from './middleware/notFound.middleware';
@@ -72,6 +74,12 @@ const createApp = (): Application => {
       uptime: process.uptime(),
     });
   });
+
+  // Mount Swagger UI at /api-docs endpoint
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'Events Platform API Documentation',
+  }));
 
   // Apply rate limiters and mount routes
   // Auth routes with stricter rate limiting
