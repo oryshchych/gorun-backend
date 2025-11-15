@@ -152,8 +152,8 @@
     - Define GET /me with authentication middleware
     - _Requirements: 1.1, 2.1, 3.1, 4.1, 5.1_
 
-- [ ] 8. Implement rate limiting
-  - [ ] 8.1 Create rate limiter middleware (src/middleware/rateLimiter.middleware.ts)
+- [x] 8. Implement rate limiting
+  - [x] 8.1 Create rate limiter middleware (src/middleware/rateLimiter.middleware.ts)
     - Create authLimiter: 5 requests per 15 minutes for auth endpoints
     - Create apiLimiter: 100 requests per 15 minutes for general API
     - Use express-rate-limit with appropriate configuration
