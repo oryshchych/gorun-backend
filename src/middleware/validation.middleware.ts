@@ -12,7 +12,7 @@ export function validate(
   schema: z.ZodSchema,
   type: ValidationType = ValidationType.BODY
 ) {
-  return async (req: Request, res: Response, next: NextFunction) => {
+  return async (req: Request, _res: Response, next: NextFunction) => {
     try {
       const dataToValidate = req[type];
       const validated = await schema.parseAsync(dataToValidate);
@@ -22,12 +22,12 @@ export function validate(
       if (error instanceof ZodError) {
         const errors: Record<string, string[]> = {};
         
-        error.errors.forEach((err) => {
-          const path = err.path.join('.');
+        error.issues.forEach((issue) => {
+          const path = issue.path.join('.');
           if (!errors[path]) {
             errors[path] = [];
           }
-          errors[path].push(err.message);
+          errors[path].push(issue.message);
         });
         
         next(new ValidationError(errors));

@@ -6,7 +6,7 @@ import { NotFoundError } from '../types/errors';
  */
 export const notFoundHandler = (
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ): void => {
   const error = new NotFoundError(`Route ${req.method} ${req.path} not found`);

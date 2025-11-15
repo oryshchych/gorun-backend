@@ -11,8 +11,8 @@ export interface JWTPayload {
 export const generateAccessToken = (userId: string): string => {
   const payload: JWTPayload = { userId };
   return jwt.sign(payload, jwtConfig.accessSecret, {
-    expiresIn: jwtConfig.accessExpiry,
-  });
+    expiresIn: jwtConfig.accessExpiry as string | number,
+  } as jwt.SignOptions);
 };
 
 /**
@@ -21,8 +21,8 @@ export const generateAccessToken = (userId: string): string => {
 export const generateRefreshToken = (userId: string): string => {
   const payload: JWTPayload = { userId };
   return jwt.sign(payload, jwtConfig.refreshSecret, {
-    expiresIn: jwtConfig.refreshExpiry,
-  });
+    expiresIn: jwtConfig.refreshExpiry as string | number,
+  } as jwt.SignOptions);
 };
 
 /**

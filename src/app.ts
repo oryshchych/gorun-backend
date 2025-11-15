@@ -67,7 +67,7 @@ const createApp = (): Application => {
   app.use(requestLogger);
 
   // Health check endpoint
-  app.get('/api/health', (req: Request, res: Response) => {
+  app.get('/api/health', (_req: Request, res: Response) => {
     res.status(200).json({
       status: 'ok',
       timestamp: new Date().toISOString(),

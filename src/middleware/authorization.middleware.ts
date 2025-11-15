@@ -10,7 +10,7 @@ import { ForbiddenError, NotFoundError } from '../types/errors';
  */
 export const isEventOrganizer = async (
   req: AuthRequest,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
