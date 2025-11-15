@@ -99,24 +99,24 @@
     - Implement middleware to handle undefined routes
     - _Requirements: 19.4_
 
-- [ ] 6. Implement validation system
-  - [ ] 6.1 Create validation middleware (src/middleware/validation.middleware.ts)
+- [x] 6. Implement validation system
+  - [x] 6.1 Create validation middleware (src/middleware/validation.middleware.ts)
     - Implement validate function that accepts Zod schema
     - Support validation of body, query, and params
     - Return formatted validation errors
     - _Requirements: 1.2, 1.3, 1.4, 8.2, 8.3, 8.4, 8.5, 8.6, 19.1, 20.4_
-  - [ ] 6.2 Create auth validators (src/validators/auth.validator.ts)
+  - [x] 6.2 Create auth validators (src/validators/auth.validator.ts)
     - Create registerSchema: name (2-50 chars), email (valid format), password (8-100 chars)
     - Create loginSchema: email, password
     - Create refreshTokenSchema: refreshToken (required)
     - _Requirements: 1.2, 1.3, 1.4, 2.1_
-  - [ ] 6.3 Create event validators (src/validators/events.validator.ts)
+  - [x] 6.3 Create event validators (src/validators/events.validator.ts)
     - Create createEventSchema: title (3-100), description (10-2000), date (future), location (3-200), capacity (1-10000), imageUrl (optional URL)
     - Create updateEventSchema: all fields optional with same validation rules
     - Create eventIdSchema: valid MongoDB ObjectId
     - Create getEventsQuerySchema: page, limit, search, startDate, endDate, location
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 8.2, 8.3, 8.4, 8.5, 8.6_
-  - [ ] 6.4 Create registration validators (src/validators/registrations.validator.ts)
+  - [x] 6.4 Create registration validators (src/validators/registrations.validator.ts)
     - Create createRegistrationSchema: eventId (valid ObjectId)
     - Create registrationIdSchema: valid MongoDB ObjectId
     - Create getRegistrationsQuerySchema: page, limit, eventId, status
