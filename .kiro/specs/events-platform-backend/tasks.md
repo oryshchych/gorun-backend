@@ -10,17 +10,17 @@
   - Create npm scripts for dev, build, start in package.json
   - _Requirements: All requirements depend on proper project setup_
 
-- [ ] 2. Configure core infrastructure
-  - [ ] 2.1 Create environment configuration module (src/config/env.ts)
+- [x] 2. Configure core infrastructure
+  - [x] 2.1 Create environment configuration module (src/config/env.ts)
     - Load and validate environment variables using dotenv
     - Export typed configuration object with PORT, MONGODB_URI, JWT secrets, CORS_ORIGIN
     - _Requirements: All requirements depend on configuration_
-  - [ ] 2.2 Create database connection module (src/config/database.ts)
+  - [x] 2.2 Create database connection module (src/config/database.ts)
     - Implement MongoDB connection using Mongoose
     - Configure connection options and error handling
     - Export connection function
     - _Requirements: All requirements depend on database connectivity_
-  - [ ] 2.3 Create logger configuration (src/config/logger.ts)
+  - [x] 2.3 Create logger configuration (src/config/logger.ts)
     - Configure Winston logger with appropriate transports
     - Set up different log levels for development and production
     - Export logger instance
