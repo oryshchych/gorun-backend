@@ -58,23 +58,23 @@
     - Implement cleanupExpired static method
     - _Requirements: 2.4, 3.1, 3.2, 3.4, 4.2_
 
-- [ ] 4. Implement utility functions
-  - [ ] 4.1 Create JWT utilities (src/utils/jwt.util.ts)
+- [x] 4. Implement utility functions
+  - [x] 4.1 Create JWT utilities (src/utils/jwt.util.ts)
     - Implement generateAccessToken function with 15m expiry
     - Implement generateRefreshToken function with 7d expiry
     - Implement verifyAccessToken function with error handling
     - Implement verifyRefreshToken function with error handling
     - _Requirements: 1.5, 2.2, 3.1, 3.2, 5.1_
-  - [ ] 4.2 Create password utilities (src/utils/password.util.ts)
+  - [x] 4.2 Create password utilities (src/utils/password.util.ts)
     - Implement hashPassword function using bcrypt with 10 salt rounds
     - Implement comparePassword function using bcrypt
     - _Requirements: 2.1, 18.1, 18.2_
-  - [ ] 4.3 Create pagination utilities (src/utils/pagination.util.ts)
+  - [x] 4.3 Create pagination utilities (src/utils/pagination.util.ts)
     - Implement getPaginationParams function to validate and calculate skip/limit
     - Implement formatPaginatedResponse function for consistent response format
     - Set default limit to 10 and maximum to 100
     - _Requirements: 6.1, 11.2, 14.2_
-  - [ ] 4.4 Create async handler utility (src/utils/asyncHandler.ts)
+  - [x] 4.4 Create async handler utility (src/utils/asyncHandler.ts)
     - Implement wrapper function to catch async errors in route handlers
     - _Requirements: 19.1, 19.2, 19.3, 19.4, 19.5, 19.6_
 
