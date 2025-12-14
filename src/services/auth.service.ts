@@ -44,11 +44,13 @@ class AuthService {
     }
 
     // Create user (password will be hashed by pre-save hook)
+    // Don't include providerId for credentials provider to avoid sparse index conflicts
     const user = await User.create({
       name: input.name,
       email: input.email.toLowerCase(),
       password: input.password,
       provider: 'credentials',
+      // providerId is intentionally omitted for credentials provider
     });
 
     // Generate tokens

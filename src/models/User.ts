@@ -1,5 +1,5 @@
-import mongoose, { Document, Schema } from 'mongoose';
 import bcrypt from 'bcrypt';
+import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IUser extends Document {
   _id: mongoose.Types.ObjectId;
@@ -48,7 +48,7 @@ const userSchema = new Schema<IUser>(
     },
     providerId: {
       type: String,
-      default: undefined,
+      // No default - field is omitted when not provided
     },
   },
   {
@@ -68,7 +68,15 @@ const userSchema = new Schema<IUser>(
 
 // Indexes
 userSchema.index({ email: 1 }, { unique: true });
-userSchema.index({ provider: 1, providerId: 1 }, { unique: true, sparse: true });
+// Partial index: only index documents where providerId exists
+// This prevents duplicate key errors for credentials users (who don't have providerId)
+userSchema.index(
+  { provider: 1, providerId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { providerId: { $exists: true } },
+  }
+);
 
 // Instance method to compare password
 userSchema.methods.comparePassword = async function (password: string): Promise<boolean> {
