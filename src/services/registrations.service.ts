@@ -1,8 +1,12 @@
 import mongoose from 'mongoose';
 import { Event } from '../models/Event';
 import { Registration } from '../models/Registration';
-import { NotFoundError, ForbiddenError, ConflictError } from '../types/errors';
-import { getPaginationParams, formatPaginatedResponse, PaginatedResponse } from '../utils/pagination.util';
+import { ConflictError, ForbiddenError, NotFoundError } from '../types/errors';
+import {
+  PaginatedResponse,
+  formatPaginatedResponse,
+  getPaginationParams,
+} from '../utils/pagination.util';
 
 export interface CreateRegistrationInput {
   eventId: string;
@@ -13,14 +17,35 @@ export interface RegistrationFilters {
   status?: 'confirmed' | 'cancelled';
 }
 
+interface PopulatedUser {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  email: string;
+  image?: string;
+}
+
+interface PopulatedEvent {
+  _id: mongoose.Types.ObjectId;
+  title: string;
+  description: string;
+  date: Date;
+  location: string;
+  capacity: number;
+  registeredCount: number;
+  organizerId: mongoose.Types.ObjectId;
+  imageUrl?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface RegistrationResponse {
   id: string;
   eventId: string;
   userId: string;
   status: 'confirmed' | 'cancelled';
   registeredAt: Date;
-  event?: any;
-  user?: any;
+  event?: PopulatedEvent;
+  user?: PopulatedUser;
 }
 
 class RegistrationsService {
@@ -72,7 +97,7 @@ class RegistrationsService {
       }
 
       // Create registration
-      const [registration] = await Registration.create(
+      const registrationArray = await Registration.create(
         [
           {
             eventId,
@@ -83,6 +108,11 @@ class RegistrationsService {
         ],
         { session }
       );
+
+      const registration = registrationArray[0];
+      if (!registration) {
+        throw new Error('Failed to create registration');
+      }
 
       // Increment registeredCount
       event.registeredCount += 1;
@@ -172,7 +202,10 @@ class RegistrationsService {
     const { page: parsedPage, limit: parsedLimit, skip } = getPaginationParams(page, limit);
 
     // Build query
-    const query: any = {};
+    const query: {
+      eventId?: string;
+      status?: 'confirmed' | 'cancelled';
+    } = {};
 
     if (filters.eventId) {
       if (!mongoose.Types.ObjectId.isValid(filters.eventId)) {
@@ -197,9 +230,7 @@ class RegistrationsService {
       .limit(parsedLimit)
       .lean();
 
-    const registrationResponses = registrations.map(reg =>
-      this.formatRegistrationResponse(reg)
-    );
+    const registrationResponses = registrations.map(reg => this.formatRegistrationResponse(reg));
 
     return formatPaginatedResponse(registrationResponses, total, parsedPage, parsedLimit);
   }
@@ -230,9 +261,7 @@ class RegistrationsService {
       .limit(parsedLimit)
       .lean();
 
-    const registrationResponses = registrations.map(reg =>
-      this.formatRegistrationResponse(reg)
-    );
+    const registrationResponses = registrations.map(reg => this.formatRegistrationResponse(reg));
 
     return formatPaginatedResponse(registrationResponses, total, parsedPage, parsedLimit);
   }
@@ -280,9 +309,7 @@ class RegistrationsService {
       .limit(parsedLimit)
       .lean();
 
-    const registrationResponses = registrations.map(reg =>
-      this.formatRegistrationResponse(reg)
-    );
+    const registrationResponses = registrations.map(reg => this.formatRegistrationResponse(reg));
 
     return formatPaginatedResponse(registrationResponses, total, parsedPage, parsedLimit);
   }
@@ -290,16 +317,29 @@ class RegistrationsService {
   /**
    * Format registration document to response format
    */
-  private formatRegistrationResponse(registration: any): RegistrationResponse {
-    return {
+  private formatRegistrationResponse(registration: {
+    _id: mongoose.Types.ObjectId | { toString(): string };
+    eventId: mongoose.Types.ObjectId | { toString(): string };
+    userId: mongoose.Types.ObjectId | { toString(): string };
+    status: 'confirmed' | 'cancelled';
+    registeredAt: Date;
+    event?: PopulatedEvent;
+    user?: PopulatedUser;
+  }): RegistrationResponse {
+    const response: RegistrationResponse = {
       id: registration._id.toString(),
       eventId: registration.eventId.toString(),
       userId: registration.userId.toString(),
       status: registration.status,
       registeredAt: registration.registeredAt,
-      event: registration.event,
-      user: registration.user,
     };
+    if (registration.event !== undefined) {
+      response.event = registration.event;
+    }
+    if (registration.user !== undefined) {
+      response.user = registration.user;
+    }
+    return response;
   }
 }
 

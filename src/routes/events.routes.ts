@@ -18,7 +18,10 @@ import {
   eventIdSchema,
   getEventsQuerySchema,
 } from '../validators/events.validator';
-import { eventIdParamSchema, getRegistrationsQuerySchema } from '../validators/registrations.validator';
+import {
+  eventIdParamSchema,
+  getRegistrationsQuerySchema,
+} from '../validators/registrations.validator';
 import { asyncHandler } from '../utils/asyncHandler';
 
 const router = Router();
@@ -27,11 +30,7 @@ const router = Router();
  * GET /api/events
  * Get all events with filters and pagination (public)
  */
-router.get(
-  '/',
-  validate(getEventsQuerySchema, ValidationType.QUERY),
-  asyncHandler(getEvents)
-);
+router.get('/', validate(getEventsQuerySchema, ValidationType.QUERY), asyncHandler(getEvents));
 
 /**
  * GET /api/events/my
@@ -49,11 +48,7 @@ router.get(
  * GET /api/events/:id
  * Get event by ID (public)
  */
-router.get(
-  '/:id',
-  validate(eventIdSchema, ValidationType.PARAMS),
-  asyncHandler(getEventById)
-);
+router.get('/:id', validate(eventIdSchema, ValidationType.PARAMS), asyncHandler(getEventById));
 
 /**
  * POST /api/events

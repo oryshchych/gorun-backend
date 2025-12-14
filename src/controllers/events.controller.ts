@@ -9,12 +9,17 @@ import eventsService from '../services/events.service';
 export const getEvents = async (req: Request, res: Response): Promise<void> => {
   const { search, startDate, endDate, location, page, limit } = req.query;
 
-  const filters = {
-    search: search as string | undefined,
-    startDate: startDate ? new Date(startDate as string) : undefined,
-    endDate: endDate ? new Date(endDate as string) : undefined,
-    location: location as string | undefined,
-  };
+  // Build filters object, only including defined values
+  const filters: {
+    search?: string;
+    startDate?: Date;
+    endDate?: Date;
+    location?: string;
+  } = {};
+  if (search) filters.search = search as string;
+  if (startDate) filters.startDate = new Date(startDate as string);
+  if (endDate) filters.endDate = new Date(endDate as string);
+  if (location) filters.location = location as string;
 
   const result = await eventsService.getEvents(
     filters,
@@ -35,6 +40,14 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
  */
 export const getEventById = async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
+
+  if (!id) {
+    res.status(400).json({
+      success: false,
+      message: 'Event ID is required',
+    });
+    return;
+  }
 
   const event = await eventsService.getEventById(id);
 
@@ -76,7 +89,22 @@ export const updateEvent = async (req: AuthRequest, res: Response): Promise<void
   const userId = req.user!.userId;
   const { title, description, date, location, capacity, imageUrl } = req.body;
 
-  const updateData: any = {};
+  if (!id) {
+    res.status(400).json({
+      success: false,
+      message: 'Event ID is required',
+    });
+    return;
+  }
+
+  const updateData: {
+    title?: string;
+    description?: string;
+    date?: Date;
+    location?: string;
+    capacity?: number;
+    imageUrl?: string;
+  } = {};
   if (title !== undefined) updateData.title = title;
   if (description !== undefined) updateData.description = description;
   if (date !== undefined) updateData.date = new Date(date);
@@ -99,6 +127,14 @@ export const updateEvent = async (req: AuthRequest, res: Response): Promise<void
 export const deleteEvent = async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
   const userId = req.user!.userId;
+
+  if (!id) {
+    res.status(400).json({
+      success: false,
+      message: 'Event ID is required',
+    });
+    return;
+  }
 
   await eventsService.deleteEvent(id, userId);
 
@@ -133,6 +169,14 @@ export const getMyEvents = async (req: AuthRequest, res: Response): Promise<void
 export const checkRegistration = async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
   const userId = req.user!.userId;
+
+  if (!id) {
+    res.status(400).json({
+      success: false,
+      message: 'Event ID is required',
+    });
+    return;
+  }
 
   const result = await eventsService.checkUserRegistration(id, userId);
 

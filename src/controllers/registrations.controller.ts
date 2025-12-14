@@ -9,10 +9,13 @@ import registrationsService from '../services/registrations.service';
 export const getRegistrations = async (req: AuthRequest, res: Response): Promise<void> => {
   const { eventId, status, page, limit } = req.query;
 
-  const filters = {
-    eventId: eventId as string | undefined,
-    status: status as 'confirmed' | 'cancelled' | undefined,
-  };
+  // Build filters object, only including defined values
+  const filters: {
+    eventId?: string;
+    status?: 'confirmed' | 'cancelled';
+  } = {};
+  if (eventId) filters.eventId = eventId as string;
+  if (status) filters.status = status as 'confirmed' | 'cancelled';
 
   const result = await registrationsService.getRegistrations(
     filters,
@@ -52,13 +55,18 @@ export const getMyRegistrations = async (req: AuthRequest, res: Response): Promi
  * Get registrations for a specific event
  * GET /api/events/:eventId/registrations
  */
-export const getEventRegistrations = async (
-  req: AuthRequest,
-  res: Response
-): Promise<void> => {
+export const getEventRegistrations = async (req: AuthRequest, res: Response): Promise<void> => {
   const { eventId } = req.params;
   const userId = req.user!.userId;
   const { page, limit } = req.query;
+
+  if (!eventId) {
+    res.status(400).json({
+      success: false,
+      message: 'Event ID is required',
+    });
+    return;
+  }
 
   const result = await registrationsService.getEventRegistrations(
     eventId,
@@ -78,10 +86,7 @@ export const getEventRegistrations = async (
  * Create a new registration
  * POST /api/registrations
  */
-export const createRegistration = async (
-  req: AuthRequest,
-  res: Response
-): Promise<void> => {
+export const createRegistration = async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user!.userId;
   const { eventId } = req.body;
 
@@ -99,12 +104,17 @@ export const createRegistration = async (
  * Cancel a registration
  * DELETE /api/registrations/:id
  */
-export const cancelRegistration = async (
-  req: AuthRequest,
-  res: Response
-): Promise<void> => {
+export const cancelRegistration = async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
   const userId = req.user!.userId;
+
+  if (!id) {
+    res.status(400).json({
+      success: false,
+      message: 'Registration ID is required',
+    });
+    return;
+  }
 
   await registrationsService.cancelRegistration(id, userId);
 

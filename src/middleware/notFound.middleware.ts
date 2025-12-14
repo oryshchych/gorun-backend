@@ -4,11 +4,7 @@ import { NotFoundError } from '../types/errors';
 /**
  * Middleware to handle undefined routes (404)
  */
-export const notFoundHandler = (
-  req: Request,
-  _res: Response,
-  next: NextFunction
-): void => {
+export const notFoundHandler = (req: Request, _res: Response, next: NextFunction): void => {
   const error = new NotFoundError(`Route ${req.method} ${req.path} not found`);
   next(error);
 };

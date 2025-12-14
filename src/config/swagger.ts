@@ -1199,7 +1199,8 @@ const options: swaggerJsdoc.Options = {
         get: {
           tags: ['Registrations'],
           summary: 'Get all registrations',
-          description: 'Get a paginated list of registrations with optional filters (requires authentication)',
+          description:
+            'Get a paginated list of registrations with optional filters (requires authentication)',
           security: [
             {
               bearerAuth: [],
@@ -1460,7 +1461,8 @@ const options: swaggerJsdoc.Options = {
         get: {
           tags: ['Registrations'],
           summary: 'Get event registrations',
-          description: 'Get registrations for a specific event (requires authentication and event ownership)',
+          description:
+            'Get registrations for a specific event (requires authentication and event ownership)',
           security: [
             {
               bearerAuth: [],

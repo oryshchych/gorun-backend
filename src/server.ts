@@ -1,5 +1,5 @@
 import app from './app';
-import { connectDatabase } from './config/database';
+import { connectDatabase, disconnectDatabase } from './config/database';
 import { serverConfig } from './config/env';
 import { logger } from './config/logger';
 
@@ -21,16 +21,16 @@ const startServer = async (): Promise<void> => {
     // Handle graceful shutdown
     const gracefulShutdown = async (signal: string): Promise<void> => {
       logger.info(`${signal} received. Starting graceful shutdown...`);
-      
+
       // Stop accepting new connections
       server.close(async () => {
         logger.info('HTTP server closed');
-        
+
         try {
           // Close database connection
-          await require('./config/database').disconnectDatabase();
+          await disconnectDatabase();
           logger.info('Database connection closed');
-          
+
           logger.info('Graceful shutdown completed');
           process.exit(0);
         } catch (error) {
@@ -57,11 +57,10 @@ const startServer = async (): Promise<void> => {
     });
 
     // Handle unhandled promise rejections
-    process.on('unhandledRejection', (reason: any) => {
+    process.on('unhandledRejection', (reason: unknown) => {
       logger.error('Unhandled Rejection:', reason);
       gracefulShutdown('unhandledRejection');
     });
-
   } catch (error) {
     logger.error('Failed to start server:', error);
     process.exit(1);

@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Configuration files
+*.config.js
+*.config.ts
+
+# Test files (if you want to exclude them)
+# **/*.test.ts
+# **/*.spec.ts
+
+# Environment files
+.env
+.env.*
+
+# Logs
+*.log
+
+# Coverage
+coverage/

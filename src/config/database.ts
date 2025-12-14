@@ -22,7 +22,7 @@ export const connectDatabase = async (): Promise<void> => {
     console.log('✅ MongoDB connected successfully');
 
     // Handle connection events
-    mongoose.connection.on('error', (error) => {
+    mongoose.connection.on('error', error => {
       console.error('❌ MongoDB connection error:', error);
     });
 
@@ -40,7 +40,6 @@ export const connectDatabase = async (): Promise<void> => {
       console.log('MongoDB connection closed due to application termination');
       process.exit(0);
     });
-
   } catch (error) {
     console.error('❌ Failed to connect to MongoDB:', error);
     throw error;

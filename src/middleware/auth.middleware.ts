@@ -1,6 +1,6 @@
-import { Request, Response, NextFunction } from 'express';
-import { verifyAccessToken } from '../utils/jwt.util';
+import { NextFunction, Request, Response } from 'express';
 import { UnauthorizedError } from '../types/errors';
+import { verifyAccessToken } from '../utils/jwt.util';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -21,7 +21,7 @@ export const authenticate = async (
   try {
     // Extract token from Authorization header
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader) {
       throw new UnauthorizedError('No authorization header provided');
     }
@@ -33,6 +33,10 @@ export const authenticate = async (
     }
 
     const token = parts[1];
+
+    if (!token) {
+      throw new UnauthorizedError('No token provided');
+    }
 
     // Verify token and extract payload
     const payload = verifyAccessToken(token);
