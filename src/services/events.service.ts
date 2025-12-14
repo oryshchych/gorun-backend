@@ -1,8 +1,12 @@
 import mongoose from 'mongoose';
 import { Event } from '../models/Event';
 import { Registration } from '../models/Registration';
-import { NotFoundError, ForbiddenError, ConflictError } from '../types/errors';
-import { getPaginationParams, formatPaginatedResponse, PaginatedResponse } from '../utils/pagination.util';
+import { ConflictError, ForbiddenError, NotFoundError } from '../types/errors';
+import {
+  PaginatedResponse,
+  formatPaginatedResponse,
+  getPaginationParams,
+} from '../utils/pagination.util';
 
 export interface CreateEventInput {
   title: string;
@@ -29,6 +33,13 @@ export interface EventFilters {
   location?: string;
 }
 
+interface PopulatedOrganizer {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  email: string;
+  image?: string;
+}
+
 export interface EventResponse {
   id: string;
   title: string;
@@ -41,7 +52,7 @@ export interface EventResponse {
   imageUrl?: string;
   createdAt: Date;
   updatedAt: Date;
-  organizer?: any;
+  organizer?: PopulatedOrganizer;
 }
 
 class EventsService {
@@ -57,7 +68,14 @@ class EventsService {
     const { page: parsedPage, limit: parsedLimit, skip } = getPaginationParams(page, limit);
 
     // Build query
-    const query: any = {};
+    const query: {
+      $text?: { $search: string };
+      date?: {
+        $gte?: Date;
+        $lte?: Date;
+      };
+      location?: { $regex: string; $options: string };
+    } = {};
 
     // Text search on title and description
     if (filters.search) {
@@ -105,9 +123,7 @@ class EventsService {
       throw new NotFoundError('Invalid event ID');
     }
 
-    const event = await Event.findById(id)
-      .populate('organizer', 'name email image')
-      .lean();
+    const event = await Event.findById(id).populate('organizer', 'name email image').lean();
 
     if (!event) {
       throw new NotFoundError('Event not found');
@@ -143,11 +159,7 @@ class EventsService {
    * Update an event
    * Check ownership, validate updates, update event
    */
-  async updateEvent(
-    id: string,
-    userId: string,
-    input: UpdateEventInput
-  ): Promise<EventResponse> {
+  async updateEvent(id: string, userId: string, input: UpdateEventInput): Promise<EventResponse> {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new NotFoundError('Invalid event ID');
     }
@@ -248,10 +260,7 @@ class EventsService {
    * Check if user is registered for an event
    * Query for confirmed registration
    */
-  async checkUserRegistration(
-    eventId: string,
-    userId: string
-  ): Promise<{ isRegistered: boolean }> {
+  async checkUserRegistration(eventId: string, userId: string): Promise<{ isRegistered: boolean }> {
     if (!mongoose.Types.ObjectId.isValid(eventId)) {
       throw new NotFoundError('Invalid event ID');
     }
@@ -277,8 +286,21 @@ class EventsService {
   /**
    * Format event document to response format
    */
-  private formatEventResponse(event: any): EventResponse {
-    return {
+  private formatEventResponse(event: {
+    _id: mongoose.Types.ObjectId | { toString(): string };
+    title: string;
+    description: string;
+    date: Date;
+    location: string;
+    capacity: number;
+    registeredCount: number;
+    organizerId: mongoose.Types.ObjectId | { toString(): string };
+    imageUrl?: string;
+    createdAt: Date;
+    updatedAt: Date;
+    organizer?: PopulatedOrganizer;
+  }): EventResponse {
+    const response: EventResponse = {
       id: event._id.toString(),
       title: event.title,
       description: event.description,
@@ -287,11 +309,16 @@ class EventsService {
       capacity: event.capacity,
       registeredCount: event.registeredCount,
       organizerId: event.organizerId.toString(),
-      imageUrl: event.imageUrl,
       createdAt: event.createdAt,
       updatedAt: event.updatedAt,
-      organizer: event.organizer,
     };
+    if (event.imageUrl !== undefined) {
+      response.imageUrl = event.imageUrl;
+    }
+    if (event.organizer !== undefined) {
+      response.organizer = event.organizer;
+    }
+    return response;
   }
 }
 

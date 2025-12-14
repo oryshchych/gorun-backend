@@ -13,10 +13,23 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
   JWT_ACCESS_EXPIRY: z.string().default('15m'),
   JWT_REFRESH_EXPIRY: z.string().default('7d'),
-  CORS_ORIGIN: z.string().default('http://localhost:3000'),
+  CORS_ORIGIN: z
+    .string()
+    .default('http://localhost:3000')
+    .transform(v => v.trim())
+    .transform(v =>
+      v
+        .split(',')
+        .map(o => new URL(o).origin)
+        .join(',')
+    ),
   RATE_LIMIT_WINDOW_MS: z.string().default('900000').transform(Number).pipe(z.number().positive()),
   RATE_LIMIT_MAX_REQUESTS: z.string().default('100').transform(Number).pipe(z.number().positive()),
-  AUTH_RATE_LIMIT_MAX_REQUESTS: z.string().default('5').transform(Number).pipe(z.number().positive()),
+  AUTH_RATE_LIMIT_MAX_REQUESTS: z
+    .string()
+    .default('5')
+    .transform(Number)
+    .pipe(z.number().positive()),
   BCRYPT_SALT_ROUNDS: z.string().default('10').transform(Number).pipe(z.number().positive()),
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
 });
@@ -27,7 +40,9 @@ const parseEnv = () => {
     return envSchema.parse(process.env);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const missingVars = error.issues.map((err: z.ZodIssue) => `${err.path.join('.')}: ${err.message}`).join('\n');
+      const missingVars = error.issues
+        .map((err: z.ZodIssue) => `${err.path.join('.')}: ${err.message}`)
+        .join('\n');
       throw new Error(`Environment validation failed:\n${missingVars}`);
     }
     throw error;
@@ -55,7 +70,7 @@ export const jwtConfig = {
 };
 
 export const corsConfig = {
-  origin: config.CORS_ORIGIN,
+  origin: new Set(config.CORS_ORIGIN.split(',').map(o => o.trim())),
 };
 
 export const rateLimitConfig = {

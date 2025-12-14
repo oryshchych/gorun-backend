@@ -17,11 +17,11 @@ import registrationsRoutes from './routes/registrations.routes';
  */
 const requestLogger = (req: Request, res: Response, next: NextFunction): void => {
   const start = Date.now();
-  
+
   res.on('finish', () => {
     const duration = Date.now() - start;
     const logMessage = `${req.method} ${req.path} ${res.statusCode} - ${duration}ms`;
-    
+
     if (res.statusCode >= 400) {
       logger.warn(logMessage, {
         method: req.method,
@@ -40,7 +40,7 @@ const requestLogger = (req: Request, res: Response, next: NextFunction): void =>
       });
     }
   });
-  
+
   next();
 };
 
@@ -51,10 +51,15 @@ const createApp = (): Application => {
   const app = express();
 
   // Apply CORS middleware with configured origin
-  app.use(cors({
-    origin: corsConfig.origin,
-    credentials: true,
-  }));
+  app.use(
+    cors({
+      origin: (origin, cb) => {
+        if (!origin) return cb(null, true); // non-browser clients
+        cb(null, corsConfig.origin.has(origin));
+      },
+      credentials: true,
+    })
+  );
 
   // Apply Helmet middleware for security headers
   app.use(helmet());
@@ -76,10 +81,14 @@ const createApp = (): Application => {
   });
 
   // Mount Swagger UI at /api-docs endpoint
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-    customCss: '.swagger-ui .topbar { display: none }',
-    customSiteTitle: 'Events Platform API Documentation',
-  }));
+  app.use(
+    '/api-docs',
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec, {
+      customCss: '.swagger-ui .topbar { display: none }',
+      customSiteTitle: 'Events Platform API Documentation',
+    })
+  );
 
   // Apply rate limiters and mount routes
   // Auth routes with stricter rate limiting

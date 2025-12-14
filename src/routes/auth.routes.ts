@@ -11,31 +11,19 @@ const router = Router();
  * POST /api/auth/register
  * Register a new user
  */
-router.post(
-  '/register',
-  validate(registerSchema, ValidationType.BODY),
-  asyncHandler(register)
-);
+router.post('/register', validate(registerSchema, ValidationType.BODY), asyncHandler(register));
 
 /**
  * POST /api/auth/login
  * Login an existing user
  */
-router.post(
-  '/login',
-  validate(loginSchema, ValidationType.BODY),
-  asyncHandler(login)
-);
+router.post('/login', validate(loginSchema, ValidationType.BODY), asyncHandler(login));
 
 /**
  * POST /api/auth/refresh
  * Refresh access token
  */
-router.post(
-  '/refresh',
-  validate(refreshTokenSchema, ValidationType.BODY),
-  asyncHandler(refresh)
-);
+router.post('/refresh', validate(refreshTokenSchema, ValidationType.BODY), asyncHandler(refresh));
 
 /**
  * POST /api/auth/logout
@@ -52,10 +40,6 @@ router.post(
  * GET /api/auth/me
  * Get current user profile (requires authentication)
  */
-router.get(
-  '/me',
-  authenticate,
-  asyncHandler(me)
-);
+router.get('/me', authenticate, asyncHandler(me));
 
 export default router;

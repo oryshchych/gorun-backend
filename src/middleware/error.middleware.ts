@@ -1,9 +1,10 @@
-import { Request, Response, NextFunction } from 'express';
-import { Error as MongooseError } from 'mongoose';
+import { NextFunction, Request, Response } from 'express';
 import { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
-import { logger } from '../config/logger';
+import { Error as MongooseError } from 'mongoose';
 import { serverConfig } from '../config/env';
+import { logger } from '../config/logger';
 import { AppError, ValidationError } from '../types/errors';
+import { AuthRequest } from './auth.middleware';
 
 interface ErrorResponse {
   error: string;
@@ -13,12 +14,17 @@ interface ErrorResponse {
   stack?: string;
 }
 
+interface MongoDuplicateKeyError extends Error {
+  code: number;
+  keyPattern?: Record<string, number>;
+}
+
 /**
  * Global error handling middleware
  */
 export const errorHandler = (
   err: Error,
-  req: Request,
+  req: Request | AuthRequest,
   res: Response,
   _next: NextFunction
 ): void => {
@@ -27,19 +33,25 @@ export const errorHandler = (
   // Handle Mongoose validation errors
   if (err instanceof MongooseError.ValidationError) {
     const errors: Record<string, string[]> = {};
-    Object.keys(err.errors).forEach((key) => {
-      errors[key] = [err.errors[key].message];
+    Object.keys(err.errors).forEach(key => {
+      const errorField = err.errors[key];
+      if (errorField) {
+        errors[key] = [errorField.message];
+      }
     });
     error = new ValidationError(errors);
   }
 
   // Handle Mongoose duplicate key errors
-  if (err.name === 'MongoError' && (err as any).code === 11000) {
-    const field = Object.keys((err as any).keyPattern || {})[0] || 'field';
-    const errors: Record<string, string[]> = {
-      [field]: [`${field} already exists`],
-    };
-    error = new ValidationError(errors);
+  if (err.name === 'MongoError' || err.name === 'MongoServerError') {
+    const mongoError = err as MongoDuplicateKeyError;
+    if (mongoError.code === 11000) {
+      const field = Object.keys(mongoError.keyPattern || {})[0] || 'field';
+      const errors: Record<string, string[]> = {
+        [field]: [`${field} already exists`],
+      };
+      error = new ValidationError(errors);
+    }
   }
 
   // Handle Mongoose CastError (invalid ObjectId)
@@ -67,7 +79,7 @@ export const errorHandler = (
     path: req.path,
     statusCode,
     ip: req.ip,
-    userId: (req as any).user?.userId,
+    userId: (req as AuthRequest).user?.userId,
     error: {
       name: err.name,
       message: err.message,

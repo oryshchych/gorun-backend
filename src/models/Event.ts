@@ -35,7 +35,7 @@ const eventSchema = new Schema<IEvent>(
       type: Date,
       required: [true, 'Date is required'],
       validate: {
-        validator: function (value: Date) {
+        validator(value: Date) {
           return value > new Date();
         },
         message: 'Event date must be in the future',
@@ -72,7 +72,7 @@ const eventSchema = new Schema<IEvent>(
       type: String,
       default: undefined,
       validate: {
-        validator: function (value: string) {
+        validator(value: string) {
           if (!value) return true;
           try {
             new URL(value);
@@ -84,16 +84,17 @@ const eventSchema = new Schema<IEvent>(
         message: 'Image URL must be a valid URL',
       },
     },
-  },
+  } as Record<string, unknown>,
   {
     timestamps: true,
     toJSON: {
       virtuals: true,
-      transform: (_doc, ret: any) => {
-        ret.id = ret._id.toString();
-        delete ret._id;
-        delete ret.__v;
-        return ret;
+      transform: (_doc, ret: Record<string, unknown>) => {
+        const transformed = ret as Record<string, unknown>;
+        transformed.id = (ret._id as mongoose.Types.ObjectId).toString();
+        delete transformed._id;
+        delete transformed.__v;
+        return transformed;
       },
     },
     toObject: {

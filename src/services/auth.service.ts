@@ -1,7 +1,7 @@
-import { User, IUser } from '../models/User';
 import { RefreshToken } from '../models/RefreshToken';
+import { IUser, User } from '../models/User';
+import { ConflictError, NotFoundError, UnauthorizedError } from '../types/errors';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwt.util';
-import { ConflictError, UnauthorizedError, NotFoundError } from '../types/errors';
 
 export interface RegisterInput {
   name: string;
@@ -18,9 +18,9 @@ export interface UserResponse {
   id: string;
   name: string;
   email: string;
-  image?: string;
+  image?: string | undefined;
   provider: string;
-  providerId?: string;
+  providerId?: string | undefined;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -179,7 +179,7 @@ class AuthService {
   async logout(refreshTokenString: string): Promise<void> {
     // Remove refresh token from database
     const result = await RefreshToken.deleteOne({ token: refreshTokenString });
-    
+
     if (result.deletedCount === 0) {
       throw new NotFoundError('Refresh token not found');
     }
@@ -190,7 +190,7 @@ class AuthService {
    */
   async getCurrentUser(userId: string): Promise<UserResponse> {
     const user = await User.findById(userId);
-    
+
     if (!user) {
       throw new NotFoundError('User not found');
     }
