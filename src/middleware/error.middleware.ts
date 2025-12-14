@@ -46,9 +46,21 @@ export const errorHandler = (
   if (err.name === 'MongoError' || err.name === 'MongoServerError') {
     const mongoError = err as MongoDuplicateKeyError;
     if (mongoError.code === 11000) {
-      const field = Object.keys(mongoError.keyPattern || {})[0] || 'field';
+      const keyPattern = mongoError.keyPattern || {};
+      const keys = Object.keys(keyPattern);
+
+      // Build a more descriptive error message
+      let fieldMessage = 'already exists';
+      if (keys.length === 1) {
+        fieldMessage = `${keys[0]} already exists`;
+      } else if (keys.length > 1) {
+        fieldMessage = `combination of ${keys.join(' and ')} already exists`;
+      }
+
+      // Use the first field for the error key, or a combined message
+      const field = keys[0] || 'field';
       const errors: Record<string, string[]> = {
-        [field]: [`${field} already exists`],
+        [field]: [fieldMessage],
       };
       error = new ValidationError(errors);
     }

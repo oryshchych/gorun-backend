@@ -1,5 +1,5 @@
-import mongoose, { Document, Schema } from 'mongoose';
 import bcrypt from 'bcrypt';
+import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IUser extends Document {
   _id: mongoose.Types.ObjectId;
@@ -48,7 +48,7 @@ const userSchema = new Schema<IUser>(
     },
     providerId: {
       type: String,
-      default: undefined,
+      // No default - field is omitted when not provided
     },
   },
   {
@@ -68,12 +68,42 @@ const userSchema = new Schema<IUser>(
 
 // Indexes
 userSchema.index({ email: 1 }, { unique: true });
-userSchema.index({ provider: 1, providerId: 1 }, { unique: true, sparse: true });
+// Partial index: only index documents where providerId exists and is not null
+// This prevents duplicate key errors for credentials users (who don't have providerId)
+userSchema.index(
+  { provider: 1, providerId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { providerId: { $exists: true, $ne: null } },
+  }
+);
 
 // Instance method to compare password
 userSchema.methods.comparePassword = async function (password: string): Promise<boolean> {
   return bcrypt.compare(password, this.password);
 };
+
+// Pre-save hook to remove providerId for credentials users
+// This ensures the field is truly omitted (not null) to work with partial index
+userSchema.pre('save', function (next) {
+  if (this.provider === 'credentials') {
+    // Use $unset to ensure the field is truly omitted from the document
+    // This prevents MongoDB from storing null, which would violate the partial unique index
+    if (this.providerId === null || this.providerId === undefined) {
+      const doc = this as unknown as {
+        $unset?: Record<string, string>;
+        _doc?: Record<string, unknown>;
+      };
+      doc.$unset = doc.$unset || {};
+      doc.$unset.providerId = '';
+      // Also remove from _doc to ensure it's not in the document
+      if (doc._doc && 'providerId' in doc._doc) {
+        delete doc._doc.providerId;
+      }
+    }
+  }
+  next();
+});
 
 // Pre-save hook to hash password
 userSchema.pre('save', async function (next) {
