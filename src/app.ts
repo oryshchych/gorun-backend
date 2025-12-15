@@ -11,6 +11,8 @@ import { notFoundHandler } from './middleware/notFound.middleware';
 import authRoutes from './routes/auth.routes';
 import eventsRoutes from './routes/events.routes';
 import registrationsRoutes from './routes/registrations.routes';
+import promoCodeRoutes from './routes/promoCodes.routes';
+import webhooksRoutes from './routes/webhooks.routes';
 
 /**
  * Request logging middleware
@@ -65,7 +67,13 @@ const createApp = (): Application => {
   app.use(helmet());
 
   // Apply JSON body parser
-  app.use(express.json());
+  app.use(
+    express.json({
+      verify: (req, _res, buf) => {
+        (req as Request & { rawBody?: string }).rawBody = buf.toString();
+      },
+    })
+  );
   app.use(express.urlencoded({ extended: true }));
 
   // Apply request logging middleware
@@ -99,6 +107,12 @@ const createApp = (): Application => {
 
   // Registrations routes with general API rate limiting
   app.use('/api/registrations', apiLimiter, registrationsRoutes);
+
+  // Promo code validation
+  app.use('/api/promo-codes', apiLimiter, promoCodeRoutes);
+
+  // Webhooks (no rate limit)
+  app.use('/api/webhooks', webhooksRoutes);
 
   // Apply 404 handler middleware for undefined routes
   app.use(notFoundHandler);
