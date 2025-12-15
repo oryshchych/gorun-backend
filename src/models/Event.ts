@@ -10,6 +10,9 @@ export interface IEvent extends Document {
   registeredCount: number;
   organizerId: mongoose.Types.ObjectId;
   imageUrl?: string;
+  basePrice?: number;
+  speakers?: string[];
+  gallery?: string[];
   createdAt: Date;
   updatedAt: Date;
   hasAvailableCapacity(): boolean;
@@ -82,6 +85,31 @@ const eventSchema = new Schema<IEvent>(
           }
         },
         message: 'Image URL must be a valid URL',
+      },
+    },
+    basePrice: {
+      type: Number,
+      min: [0, 'Base price cannot be negative'],
+    },
+    speakers: {
+      type: [String],
+      default: [],
+    },
+    gallery: {
+      type: [String],
+      default: [],
+      validate: {
+        validator(values: string[]) {
+          return values.every(value => {
+            try {
+              new URL(value);
+              return true;
+            } catch {
+              return false;
+            }
+          });
+        },
+        message: 'Gallery items must be valid URLs',
       },
     },
   } as Record<string, unknown>,
