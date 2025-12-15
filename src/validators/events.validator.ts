@@ -29,6 +29,9 @@ export const createEventSchema = z.object({
     .min(1, { message: 'Capacity must be at least 1' })
     .max(10000, { message: 'Capacity must not exceed 10000' }),
   imageUrl: z.url({ message: 'Invalid URL format' }).optional(),
+  basePrice: z.number().nonnegative({ message: 'Base price cannot be negative' }).optional(),
+  speakers: z.array(z.string().min(1)).optional(),
+  gallery: z.array(z.string().url({ message: 'Gallery items must be valid URLs' })).optional(),
 });
 
 export const updateEventSchema = z.object({
@@ -62,6 +65,9 @@ export const updateEventSchema = z.object({
     .max(10000, { message: 'Capacity must not exceed 10000' })
     .optional(),
   imageUrl: z.url({ message: 'Invalid URL format' }).optional(),
+  basePrice: z.number().nonnegative({ message: 'Base price cannot be negative' }).optional(),
+  speakers: z.array(z.string().min(1)).optional(),
+  gallery: z.array(z.string().url({ message: 'Gallery items must be valid URLs' })).optional(),
 });
 
 export const eventIdSchema = z.object({
