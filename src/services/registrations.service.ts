@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
+import { eventConfig } from '../config/env';
 import { Event } from '../models/Event';
+import { IPayment } from '../models/Payment';
 import { Registration } from '../models/Registration';
 import { ConflictError, ForbiddenError, NotFoundError } from '../types/errors';
 import {
@@ -7,14 +9,28 @@ import {
   formatPaginatedResponse,
   getPaginationParams,
 } from '../utils/pagination.util';
+import { calculatePrice } from '../utils/pricing.util';
+import paymentsService from './payments.service';
+import promoCodesService from './promoCodes.service';
 
 export interface CreateRegistrationInput {
   eventId: string;
 }
 
+export interface CreatePublicRegistrationInput {
+  eventId: string;
+  name: string;
+  surname: string;
+  email: string;
+  city: string;
+  runningClub?: string;
+  phone?: string;
+  promoCode?: string;
+}
+
 export interface RegistrationFilters {
   eventId?: string;
-  status?: 'confirmed' | 'cancelled';
+  status?: 'pending' | 'confirmed' | 'cancelled';
 }
 
 interface PopulatedUser {
@@ -41,11 +57,30 @@ interface PopulatedEvent {
 export interface RegistrationResponse {
   id: string;
   eventId: string;
-  userId: string;
-  status: 'confirmed' | 'cancelled';
+  userId?: string;
+  status: 'pending' | 'confirmed' | 'cancelled';
   registeredAt: Date;
+  name?: string;
+  surname?: string;
+  email?: string;
+  city?: string;
+  runningClub?: string;
+  phone?: string;
+  promoCode?: string;
+  paymentStatus?: 'pending' | 'completed' | 'failed';
+  paymentId?: string;
+  finalPrice?: number;
   event?: PopulatedEvent;
   user?: PopulatedUser;
+}
+
+export interface PublicParticipant {
+  id: string;
+  name?: string;
+  surname?: string;
+  city?: string;
+  runningClub?: string;
+  registeredAt: Date;
 }
 
 class RegistrationsService {
@@ -103,6 +138,7 @@ class RegistrationsService {
             eventId,
             userId,
             status: 'confirmed',
+            paymentStatus: 'completed',
             registeredAt: new Date(),
           },
         ],
@@ -138,6 +174,105 @@ class RegistrationsService {
   }
 
   /**
+   * Public registration flow (no authentication)
+   * Validate event, capacity, promo code, create registration + payment
+   */
+  async createPublicRegistration(
+    input: CreatePublicRegistrationInput
+  ): Promise<{ registration: RegistrationResponse; paymentLink?: string }> {
+    const { eventId, name, surname, email, city, runningClub, phone, promoCode } = input;
+    const resolvedEventId = this.resolveEventId(eventId);
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const event = await Event.findById(resolvedEventId).session(session);
+      if (!event) {
+        throw new NotFoundError('Event not found');
+      }
+
+      if (!event.hasAvailableCapacity()) {
+        throw new ConflictError('Event is full');
+      }
+
+      // Prevent duplicate registration by email for this event
+      const existing = await Registration.findOne({
+        eventId: resolvedEventId,
+        email: email.toLowerCase(),
+      }).session(session);
+
+      if (existing) {
+        throw new ConflictError('This email is already registered for the event');
+      }
+
+      const validatedPromo = promoCode
+        ? await promoCodesService.validate(promoCode, resolvedEventId)
+        : null;
+
+      const basePrice = event.basePrice ?? eventConfig.basePrice;
+      if (basePrice === undefined) {
+        throw new ConflictError('Event price is not configured');
+      }
+
+      const { finalPrice } = calculatePrice(basePrice, validatedPromo);
+
+      const registrationArray = await Registration.create(
+        [
+          {
+            eventId: resolvedEventId,
+            name,
+            surname,
+            email: email.toLowerCase(),
+            city,
+            runningClub,
+            phone,
+            promoCode: validatedPromo?.code ?? promoCode?.toUpperCase(),
+            promoCodeId: validatedPromo?._id,
+            status: 'pending',
+            paymentStatus: 'pending',
+            registeredAt: new Date(),
+            finalPrice,
+          },
+        ],
+        { session }
+      );
+
+      const registration = registrationArray[0];
+      if (!registration) {
+        throw new Error('Failed to create registration');
+      }
+
+      const { payment, paymentLink } = await paymentsService.createPaymentWithInvoice({
+        registrationId: registration._id.toString(),
+        amount: finalPrice,
+        customerName: `${name} ${surname}`.trim(),
+        eventTitle: event.title,
+        session,
+      });
+
+      registration.paymentId = payment._id.toString();
+      await registration.save(session ? { session } : undefined);
+
+      await session.commitTransaction();
+
+      const responsePayload: { registration: RegistrationResponse; paymentLink?: string } = {
+        registration: this.formatRegistrationResponse(registration.toObject()),
+      };
+      if (paymentLink) {
+        responsePayload.paymentLink = paymentLink;
+      }
+
+      return responsePayload;
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  /**
    * Cancel a registration
    * Verify ownership, update status to cancelled and decrement registeredCount in transaction
    */
@@ -159,7 +294,7 @@ class RegistrationsService {
       }
 
       // Check ownership
-      if (registration.userId.toString() !== userId) {
+      if (!registration.userId || registration.userId.toString() !== userId) {
         throw new ForbiddenError('You are not authorized to cancel this registration');
       }
 
@@ -204,7 +339,7 @@ class RegistrationsService {
     // Build query
     const query: {
       eventId?: string;
-      status?: 'confirmed' | 'cancelled';
+      status?: 'pending' | 'confirmed' | 'cancelled';
     } = {};
 
     if (filters.eventId) {
@@ -315,30 +450,188 @@ class RegistrationsService {
   }
 
   /**
+   * Public list of participants (confirmed only)
+   */
+  async getPublicParticipants(eventId: string): Promise<PublicParticipant[]> {
+    const resolvedEventId = this.resolveEventId(eventId);
+
+    const event = await Event.findById(resolvedEventId);
+    if (!event) {
+      throw new NotFoundError('Event not found');
+    }
+
+    const participants = await Registration.find({
+      eventId: resolvedEventId,
+      status: 'confirmed',
+    })
+      .select('name surname city runningClub registeredAt')
+      .sort({ registeredAt: -1 })
+      .lean();
+
+    return participants.map(participant => {
+      const record: PublicParticipant = {
+        id: participant._id.toString(),
+        registeredAt: participant.registeredAt,
+      };
+      if (participant.name !== undefined) record.name = participant.name;
+      if (participant.surname !== undefined) record.surname = participant.surname;
+      if (participant.city !== undefined) record.city = participant.city;
+      if (participant.runningClub !== undefined) record.runningClub = participant.runningClub;
+      return record;
+    });
+  }
+
+  /**
+   * Mark payment as completed and confirm registration
+   */
+  async markPaymentCompleted(
+    payment: IPayment,
+    plataPaymentId?: string,
+    webhookData?: Record<string, unknown>
+  ): Promise<RegistrationResponse> {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const registration = await Registration.findById(payment.registrationId).session(session);
+      if (!registration) {
+        throw new NotFoundError('Registration not found for payment');
+      }
+
+      registration.paymentStatus = 'completed';
+      registration.status = 'confirmed';
+      await registration.save(session ? { session } : undefined);
+
+      await Event.updateOne(
+        { _id: registration.eventId },
+        { $inc: { registeredCount: 1 } },
+        { session }
+      );
+      const updates: Partial<Pick<IPayment, 'plataMonoPaymentId' | 'webhookData'>> = {};
+      if (plataPaymentId !== undefined) {
+        updates.plataMonoPaymentId = plataPaymentId;
+      }
+      if (webhookData !== undefined) {
+        updates.webhookData = webhookData;
+      }
+      await paymentsService.updateStatus(payment._id.toString(), 'completed', updates, session);
+
+      if (registration.promoCodeId) {
+        await promoCodesService.incrementUsage(registration.promoCodeId.toString(), session);
+      }
+
+      await session.commitTransaction();
+
+      return this.formatRegistrationResponse(registration.toObject());
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  /**
+   * Mark payment as failed and keep registration pending for retry
+   */
+  async markPaymentFailed(
+    payment: IPayment,
+    webhookData?: Record<string, unknown>
+  ): Promise<RegistrationResponse> {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const registration = await Registration.findById(payment.registrationId).session(session);
+      if (!registration) {
+        throw new NotFoundError('Registration not found for payment');
+      }
+
+      registration.paymentStatus = 'failed';
+      registration.status = 'pending';
+      await registration.save(session ? { session } : undefined);
+
+      const updates: Partial<Pick<IPayment, 'plataMonoPaymentId' | 'webhookData'>> = {};
+      if (webhookData !== undefined) {
+        updates.webhookData = webhookData;
+      }
+
+      await paymentsService.updateStatus(payment._id.toString(), 'failed', updates, session);
+
+      await session.commitTransaction();
+
+      return this.formatRegistrationResponse(registration.toObject());
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  /**
+   * Resolve event id from input or fallback to configured single event id
+   */
+  private resolveEventId(eventId: string): string {
+    if (mongoose.Types.ObjectId.isValid(eventId)) {
+      return eventId;
+    }
+    if (eventConfig.singleEventId && mongoose.Types.ObjectId.isValid(eventConfig.singleEventId)) {
+      return eventConfig.singleEventId;
+    }
+    throw new NotFoundError('Invalid event ID');
+  }
+
+  /**
    * Format registration document to response format
    */
   private formatRegistrationResponse(registration: {
     _id: mongoose.Types.ObjectId | { toString(): string };
     eventId: mongoose.Types.ObjectId | { toString(): string };
-    userId: mongoose.Types.ObjectId | { toString(): string };
-    status: 'confirmed' | 'cancelled';
+    userId?: mongoose.Types.ObjectId | { toString(): string };
+    status: 'pending' | 'confirmed' | 'cancelled';
     registeredAt: Date;
+    name?: string;
+    surname?: string;
+    email?: string;
+    city?: string;
+    runningClub?: string;
+    phone?: string;
+    promoCode?: string;
+    paymentStatus?: 'pending' | 'completed' | 'failed';
+    paymentId?: string;
+    finalPrice?: number;
     event?: PopulatedEvent;
     user?: PopulatedUser;
   }): RegistrationResponse {
     const response: RegistrationResponse = {
       id: registration._id.toString(),
       eventId: registration.eventId.toString(),
-      userId: registration.userId.toString(),
       status: registration.status,
       registeredAt: registration.registeredAt,
     };
+
+    if (registration.userId) {
+      response.userId = registration.userId.toString();
+    }
     if (registration.event !== undefined) {
       response.event = registration.event;
     }
     if (registration.user !== undefined) {
       response.user = registration.user;
     }
+    if (registration.name !== undefined) response.name = registration.name;
+    if (registration.surname !== undefined) response.surname = registration.surname;
+    if (registration.email !== undefined) response.email = registration.email;
+    if (registration.city !== undefined) response.city = registration.city;
+    if (registration.runningClub !== undefined) response.runningClub = registration.runningClub;
+    if (registration.phone !== undefined) response.phone = registration.phone;
+    if (registration.promoCode !== undefined) response.promoCode = registration.promoCode;
+    if (registration.paymentStatus !== undefined)
+      response.paymentStatus = registration.paymentStatus;
+    if (registration.paymentId !== undefined) response.paymentId = registration.paymentId;
+    if (registration.finalPrice !== undefined) response.finalPrice = registration.finalPrice;
+
     return response;
   }
 }

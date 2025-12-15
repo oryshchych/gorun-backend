@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { eventConfig } from '../config/env';
 import { Event } from '../models/Event';
 import { Registration } from '../models/Registration';
 import { ConflictError, ForbiddenError, NotFoundError } from '../types/errors';
@@ -15,6 +16,9 @@ export interface CreateEventInput {
   location: string;
   capacity: number;
   imageUrl?: string;
+  basePrice?: number;
+  speakers?: string[];
+  gallery?: string[];
 }
 
 export interface UpdateEventInput {
@@ -24,6 +28,9 @@ export interface UpdateEventInput {
   location?: string;
   capacity?: number;
   imageUrl?: string;
+  basePrice?: number;
+  speakers?: string[];
+  gallery?: string[];
 }
 
 export interface EventFilters {
@@ -50,6 +57,9 @@ export interface EventResponse {
   registeredCount: number;
   organizerId: string;
   imageUrl?: string;
+  basePrice?: number;
+  speakers?: string[];
+  gallery?: string[];
   createdAt: Date;
   updatedAt: Date;
   organizer?: PopulatedOrganizer;
@@ -112,6 +122,27 @@ class EventsService {
     const eventResponses = events.map(event => this.formatEventResponse(event));
 
     return formatPaginatedResponse(eventResponses, total, parsedPage, parsedLimit);
+  }
+
+  /**
+   * Get the single configured event for the public MVP
+   */
+  async getSingleEvent(): Promise<EventResponse> {
+    let event = null;
+
+    if (eventConfig.singleEventId && mongoose.Types.ObjectId.isValid(eventConfig.singleEventId)) {
+      event = await Event.findById(eventConfig.singleEventId).lean();
+    }
+
+    if (!event) {
+      event = await Event.findOne().sort({ createdAt: 1 }).lean();
+    }
+
+    if (!event) {
+      throw new NotFoundError('Event not found');
+    }
+
+    return this.formatEventResponse(event);
   }
 
   /**
@@ -296,6 +327,9 @@ class EventsService {
     registeredCount: number;
     organizerId: mongoose.Types.ObjectId | { toString(): string };
     imageUrl?: string;
+    basePrice?: number;
+    speakers?: string[];
+    gallery?: string[];
     createdAt: Date;
     updatedAt: Date;
     organizer?: PopulatedOrganizer;
@@ -314,6 +348,15 @@ class EventsService {
     };
     if (event.imageUrl !== undefined) {
       response.imageUrl = event.imageUrl;
+    }
+    if (event.basePrice !== undefined) {
+      response.basePrice = event.basePrice;
+    }
+    if (event.speakers !== undefined) {
+      response.speakers = event.speakers;
+    }
+    if (event.gallery !== undefined) {
+      response.gallery = event.gallery;
     }
     if (event.organizer !== undefined) {
       response.organizer = event.organizer;
