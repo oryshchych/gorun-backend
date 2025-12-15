@@ -2,17 +2,18 @@ import { Router } from 'express';
 import {
   getRegistrations,
   getMyRegistrations,
-  createRegistration,
+  createPublicRegistration,
   cancelRegistration,
 } from '../controllers/registrations.controller';
 import { authenticate } from '../middleware/auth.middleware';
 import { validate, ValidationType } from '../middleware/validation.middleware';
 import {
-  createRegistrationSchema,
+  createPublicRegistrationSchema,
   registrationIdSchema,
   getRegistrationsQuerySchema,
 } from '../validators/registrations.validator';
 import { asyncHandler } from '../utils/asyncHandler';
+import { registrationLimiter } from '../middleware/rateLimiter.middleware';
 
 const router = Router();
 
@@ -41,13 +42,13 @@ router.get(
 
 /**
  * POST /api/registrations
- * Create a new registration (requires authentication)
+ * Create a new registration (public)
  */
 router.post(
   '/',
-  authenticate,
-  validate(createRegistrationSchema, ValidationType.BODY),
-  asyncHandler(createRegistration)
+  registrationLimiter,
+  validate(createPublicRegistrationSchema, ValidationType.BODY),
+  asyncHandler(createPublicRegistration)
 );
 
 /**
