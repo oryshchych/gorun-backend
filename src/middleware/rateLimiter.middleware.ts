@@ -27,3 +27,27 @@ export const apiLimiter = rateLimit({
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   skipSuccessfulRequests: false, // Count all requests
 });
+
+/**
+ * Rate limiter for public registration endpoint
+ * 5 requests per minute per IP
+ */
+export const registrationLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  message: 'Too many registration attempts, please try again in a minute',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+/**
+ * Rate limiter for promo code validation
+ * 10 requests per minute per IP
+ */
+export const promoCodeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: 'Too many promo code requests, please try again in a minute',
+  standardHeaders: true,
+  legacyHeaders: false,
+});

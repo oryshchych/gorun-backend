@@ -7,6 +7,7 @@ import { AppError, ValidationError } from '../types/errors';
 import { AuthRequest } from './auth.middleware';
 
 interface ErrorResponse {
+  success: false;
   error: string;
   message: string;
   statusCode: number;
@@ -107,6 +108,7 @@ export const errorHandler = (
 
   // Build error response
   const errorResponse: ErrorResponse = {
+    success: false,
     error: err.name || 'Error',
     message,
     statusCode,
