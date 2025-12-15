@@ -3,6 +3,19 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import eventsService from '../services/events.service';
 
 /**
+ * Get the single public event
+ * GET /api/events/single
+ */
+export const getSingleEvent = async (_req: Request, res: Response): Promise<void> => {
+  const event = await eventsService.getSingleEvent();
+
+  res.status(200).json({
+    success: true,
+    data: event,
+  });
+};
+
+/**
  * Get all events with filters and pagination
  * GET /api/events
  */
@@ -63,7 +76,8 @@ export const getEventById = async (req: Request, res: Response): Promise<void> =
  */
 export const createEvent = async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user!.userId;
-  const { title, description, date, location, capacity, imageUrl } = req.body;
+  const { title, description, date, location, capacity, imageUrl, basePrice, speakers, gallery } =
+    req.body;
 
   const event = await eventsService.createEvent(userId, {
     title,
@@ -72,6 +86,9 @@ export const createEvent = async (req: AuthRequest, res: Response): Promise<void
     location,
     capacity,
     imageUrl,
+    basePrice,
+    speakers,
+    gallery,
   });
 
   res.status(201).json({
@@ -87,7 +104,8 @@ export const createEvent = async (req: AuthRequest, res: Response): Promise<void
 export const updateEvent = async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
   const userId = req.user!.userId;
-  const { title, description, date, location, capacity, imageUrl } = req.body;
+  const { title, description, date, location, capacity, imageUrl, basePrice, speakers, gallery } =
+    req.body;
 
   if (!id) {
     res.status(400).json({
@@ -104,6 +122,9 @@ export const updateEvent = async (req: AuthRequest, res: Response): Promise<void
     location?: string;
     capacity?: number;
     imageUrl?: string;
+    basePrice?: number;
+    speakers?: string[];
+    gallery?: string[];
   } = {};
   if (title !== undefined) updateData.title = title;
   if (description !== undefined) updateData.description = description;
@@ -111,6 +132,9 @@ export const updateEvent = async (req: AuthRequest, res: Response): Promise<void
   if (location !== undefined) updateData.location = location;
   if (capacity !== undefined) updateData.capacity = capacity;
   if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
+  if (basePrice !== undefined) updateData.basePrice = basePrice;
+  if (speakers !== undefined) updateData.speakers = speakers;
+  if (gallery !== undefined) updateData.gallery = gallery;
 
   const event = await eventsService.updateEvent(id, userId, updateData);
 
