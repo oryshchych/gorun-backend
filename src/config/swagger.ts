@@ -200,6 +200,22 @@ const options: swaggerJsdoc.Options = {
               description: 'Event image URL',
               example: 'https://example.com/event-image.jpg',
             },
+            basePrice: {
+              type: 'number',
+              description: 'Base registration price in UAH',
+              example: 1000,
+            },
+            speakers: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'List of speakers',
+              example: ['Speaker 1', 'Speaker 2'],
+            },
+            gallery: {
+              type: 'array',
+              items: { type: 'string', format: 'uri' },
+              description: 'Gallery image URLs',
+            },
             createdAt: {
               type: 'string',
               format: 'date-time',
@@ -481,6 +497,83 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        PromoCode: {
+          type: 'object',
+          properties: {
+            code: { type: 'string', example: 'DISCOUNT10' },
+            discountType: { type: 'string', enum: ['percentage', 'amount'] },
+            discountValue: { type: 'number', example: 10 },
+            usageLimit: { type: 'integer', example: 100 },
+            usedCount: { type: 'integer', example: 5 },
+            isActive: { type: 'boolean', example: true },
+            expirationDate: { type: 'string', format: 'date-time' },
+            eventId: { type: 'string' },
+          },
+        },
+        PromoCodeValidationRequest: {
+          type: 'object',
+          required: ['code'],
+          properties: {
+            code: { type: 'string', example: 'DISCOUNT10' },
+            eventId: { type: 'string', description: 'Optional event id for event-specific codes' },
+          },
+        },
+        PublicRegistrationInput: {
+          type: 'object',
+          required: ['eventId', 'name', 'surname', 'email', 'city'],
+          properties: {
+            eventId: { type: 'string', description: 'Event identifier (UUID or ObjectId)' },
+            name: { type: 'string', example: 'John' },
+            surname: { type: 'string', example: 'Doe' },
+            email: { type: 'string', format: 'email', example: 'john@example.com' },
+            city: { type: 'string', example: 'Kyiv' },
+            runningClub: { type: 'string', example: 'Kyiv Running Club' },
+            phone: { type: 'string', example: '+380501234567' },
+            promoCode: { type: 'string', example: 'DISCOUNT10' },
+          },
+        },
+        PublicRegistration: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            eventId: { type: 'string' },
+            name: { type: 'string' },
+            surname: { type: 'string' },
+            email: { type: 'string' },
+            city: { type: 'string' },
+            runningClub: { type: 'string' },
+            phone: { type: 'string' },
+            promoCode: { type: 'string' },
+            status: { type: 'string', enum: ['pending', 'confirmed', 'cancelled'] },
+            paymentStatus: { type: 'string', enum: ['pending', 'completed', 'failed'] },
+            registeredAt: { type: 'string', format: 'date-time' },
+            finalPrice: { type: 'number', example: 900 },
+          },
+        },
+        Participant: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            name: { type: 'string' },
+            surname: { type: 'string' },
+            city: { type: 'string' },
+            runningClub: { type: 'string' },
+            registeredAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        Payment: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            registrationId: { type: 'string' },
+            amount: { type: 'number' },
+            currency: { type: 'string', example: 'UAH' },
+            status: { type: 'string', enum: ['pending', 'completed', 'failed', 'refunded'] },
+            plataMonoInvoiceId: { type: 'string' },
+            plataMonoPaymentId: { type: 'string' },
+            paymentLink: { type: 'string' },
+          },
+        },
       },
     },
     tags: [
@@ -495,6 +588,14 @@ const options: swaggerJsdoc.Options = {
       {
         name: 'Registrations',
         description: 'Event registration management endpoints',
+      },
+      {
+        name: 'Payments',
+        description: 'Payment processing and webhook endpoints',
+      },
+      {
+        name: 'Promo Codes',
+        description: 'Promo code validation endpoints',
       },
       {
         name: 'Health',
@@ -894,6 +995,35 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+      '/api/events/single': {
+        get: {
+          tags: ['Events'],
+          summary: 'Get the single public event',
+          description: 'Returns the single event configured for the public MVP',
+          responses: {
+            200: {
+              description: 'Single event retrieved successfully',
+              content: {
+                'application/json': {
+                  schema: {
+                    $ref: '#/components/schemas/Event',
+                  },
+                },
+              },
+            },
+            404: {
+              description: 'Event not found',
+              content: {
+                'application/json': {
+                  schema: {
+                    $ref: '#/components/schemas/Error',
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       '/api/events/my': {
         get: {
           tags: ['Events'],
@@ -1140,6 +1270,49 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+      '/api/events/{eventId}/participants': {
+        get: {
+          tags: ['Events'],
+          summary: 'Get public participants',
+          description: 'Get confirmed participants for an event (public, no sensitive fields)',
+          parameters: [
+            {
+              name: 'eventId',
+              in: 'path',
+              required: true,
+              description: 'Event ID',
+              schema: { type: 'string' },
+            },
+          ],
+          responses: {
+            200: {
+              description: 'Participants retrieved successfully',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean' },
+                      data: {
+                        type: 'array',
+                        items: { $ref: '#/components/schemas/Participant' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            404: {
+              description: 'Event not found',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/Error' },
+                },
+              },
+            },
+          },
+        },
+      },
       '/api/events/{id}/check-registration': {
         get: {
           tags: ['Events'],
@@ -1271,19 +1444,15 @@ const options: swaggerJsdoc.Options = {
         },
         post: {
           tags: ['Registrations'],
-          summary: 'Create a registration',
-          description: 'Register for an event (requires authentication)',
-          security: [
-            {
-              bearerAuth: [],
-            },
-          ],
+          summary: 'Create a registration (public)',
+          description:
+            'Register for the public event without authentication. Returns a payment link.',
           requestBody: {
             required: true,
             content: {
               'application/json': {
                 schema: {
-                  $ref: '#/components/schemas/CreateRegistrationInput',
+                  $ref: '#/components/schemas/PublicRegistrationInput',
                 },
               },
             },
@@ -1294,7 +1463,12 @@ const options: swaggerJsdoc.Options = {
               content: {
                 'application/json': {
                   schema: {
-                    $ref: '#/components/schemas/Registration',
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean' },
+                      data: { $ref: '#/components/schemas/PublicRegistration' },
+                      paymentLink: { type: 'string' },
+                    },
                   },
                 },
               },
@@ -1451,6 +1625,73 @@ const options: swaggerJsdoc.Options = {
                   schema: {
                     $ref: '#/components/schemas/Error',
                   },
+                },
+              },
+            },
+          },
+        },
+      },
+      '/api/promo-codes/validate': {
+        post: {
+          tags: ['Promo Codes'],
+          summary: 'Validate promo code',
+          description: 'Validate a promo code for the event (public)',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/PromoCodeValidationRequest' },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: 'Promo code validated successfully',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean' },
+                      data: { $ref: '#/components/schemas/PromoCode' },
+                    },
+                  },
+                },
+              },
+            },
+            400: {
+              description: 'Invalid or expired promo code',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/Error' },
+                },
+              },
+            },
+          },
+        },
+      },
+      '/api/webhooks/plata-mono': {
+        post: {
+          tags: ['Payments'],
+          summary: 'Plata by Mono webhook',
+          description: 'Webhook endpoint for Plata by Mono payment status updates',
+          responses: {
+            200: {
+              description: 'Webhook processed',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: { success: { type: 'boolean' } },
+                  },
+                },
+              },
+            },
+            400: {
+              description: 'Invalid payload or signature',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/Error' },
                 },
               },
             },

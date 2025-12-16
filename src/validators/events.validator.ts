@@ -3,15 +3,61 @@ import { z } from 'zod';
 // Helper to validate MongoDB ObjectId format
 const objectIdRegex = /^[0-9a-fA-F]{24}$/;
 
+const localeString = (min: number, max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max, { message: `Must not exceed ${max} characters` })
+    .refine(val => val.length === 0 || val.length >= min, {
+      message: `Must be at least ${min} characters or empty`,
+    });
+
+const translationsSchema = z.object({
+  title: z.object({
+    en: z
+      .string()
+      .trim()
+      .min(3, { message: 'Title (en) must be at least 3 characters' })
+      .max(100, { message: 'Title (en) must not exceed 100 characters' }),
+    uk: localeString(3, 100),
+  }),
+  description: z.object({
+    en: z
+      .string()
+      .trim()
+      .min(10, { message: 'Description (en) must be at least 10 characters' })
+      .max(2000, { message: 'Description (en) must not exceed 2000 characters' }),
+    uk: localeString(10, 2000),
+  }),
+  location: z.object({
+    en: z
+      .string()
+      .trim()
+      .min(3, { message: 'Location (en) must be at least 3 characters' })
+      .max(200, { message: 'Location (en) must not exceed 200 characters' }),
+    uk: localeString(3, 200),
+  }),
+  speakers: z
+    .array(
+      z.object({
+        en: z
+          .string()
+          .trim()
+          .min(1, { message: 'Speaker (en) must have at least 1 character' })
+          .max(100),
+        uk: localeString(1, 100),
+      })
+    )
+    .optional(),
+});
+
 export const createEventSchema = z.object({
-  title: z
-    .string()
-    .min(3, { message: 'Title must be at least 3 characters' })
-    .max(100, { message: 'Title must not exceed 100 characters' }),
-  description: z
-    .string()
-    .min(10, { message: 'Description must be at least 10 characters' })
-    .max(2000, { message: 'Description must not exceed 2000 characters' }),
+  translations: translationsSchema,
+  // Legacy fallbacks still accepted; they will be derived from translations if not provided
+  title: z.string().optional(),
+  description: z.string().optional(),
+  location: z.string().optional(),
+  speakers: z.array(z.string().min(1)).optional(),
   date: z
     .string()
     .or(z.date())
@@ -19,29 +65,25 @@ export const createEventSchema = z.object({
     .refine(date => date > new Date(), {
       message: 'Event date must be in the future',
     }),
-  location: z
-    .string()
-    .min(3, { message: 'Location must be at least 3 characters' })
-    .max(200, { message: 'Location must not exceed 200 characters' }),
   capacity: z
     .number()
     .int({ message: 'Capacity must be an integer' })
     .min(1, { message: 'Capacity must be at least 1' })
     .max(10000, { message: 'Capacity must not exceed 10000' }),
   imageUrl: z.url({ message: 'Invalid URL format' }).optional(),
+  basePrice: z.number().nonnegative({ message: 'Base price cannot be negative' }).optional(),
+  gallery: z.array(z.string().url({ message: 'Gallery items must be valid URLs' })).optional(),
 });
 
 export const updateEventSchema = z.object({
-  title: z
-    .string()
-    .min(3, { message: 'Title must be at least 3 characters' })
-    .max(100, { message: 'Title must not exceed 100 characters' })
+  translations: translationsSchema
+    .partial()
+    .refine(val => val === undefined || Object.keys(val).length > 0, {
+      message: 'Translations cannot be empty',
+    })
     .optional(),
-  description: z
-    .string()
-    .min(10, { message: 'Description must be at least 10 characters' })
-    .max(2000, { message: 'Description must not exceed 2000 characters' })
-    .optional(),
+  title: z.string().optional(),
+  description: z.string().optional(),
   date: z
     .string()
     .or(z.date())
@@ -50,11 +92,7 @@ export const updateEventSchema = z.object({
       message: 'Event date must be in the future',
     })
     .optional(),
-  location: z
-    .string()
-    .min(3, { message: 'Location must be at least 3 characters' })
-    .max(200, { message: 'Location must not exceed 200 characters' })
-    .optional(),
+  location: z.string().optional(),
   capacity: z
     .number()
     .int({ message: 'Capacity must be an integer' })
@@ -62,6 +100,9 @@ export const updateEventSchema = z.object({
     .max(10000, { message: 'Capacity must not exceed 10000' })
     .optional(),
   imageUrl: z.url({ message: 'Invalid URL format' }).optional(),
+  basePrice: z.number().nonnegative({ message: 'Base price cannot be negative' }).optional(),
+  speakers: z.array(z.string().min(1)).optional(),
+  gallery: z.array(z.string().url({ message: 'Gallery items must be valid URLs' })).optional(),
 });
 
 export const eventIdSchema = z.object({
@@ -91,4 +132,5 @@ export const getEventsQuerySchema = z.object({
     .optional()
     .transform(val => (val ? new Date(val) : undefined)),
   location: z.string().optional(),
+  lang: z.enum(['en', 'uk']).optional(),
 });

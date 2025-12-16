@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import registrationsService from '../services/registrations.service';
 
@@ -83,6 +83,20 @@ export const getEventRegistrations = async (req: AuthRequest, res: Response): Pr
 };
 
 /**
+ * Create a new registration (public)
+ * POST /api/registrations
+ */
+export const createPublicRegistration = async (req: Request, res: Response): Promise<void> => {
+  const registration = await registrationsService.createPublicRegistration(req.body);
+
+  res.status(201).json({
+    success: true,
+    data: registration.registration,
+    paymentLink: registration.paymentLink,
+  });
+};
+
+/**
  * Create a new registration
  * POST /api/registrations
  */
@@ -119,4 +133,27 @@ export const cancelRegistration = async (req: AuthRequest, res: Response): Promi
   await registrationsService.cancelRegistration(id, userId);
 
   res.status(204).send();
+};
+
+/**
+ * Get public list of participants for an event
+ * GET /api/events/:eventId/participants
+ */
+export const getPublicParticipants = async (req: Request, res: Response): Promise<void> => {
+  const { eventId } = req.params;
+
+  if (!eventId) {
+    res.status(400).json({
+      success: false,
+      message: 'Event ID is required',
+    });
+    return;
+  }
+
+  const participants = await registrationsService.getPublicParticipants(eventId);
+
+  res.status(200).json({
+    success: true,
+    data: participants,
+  });
 };

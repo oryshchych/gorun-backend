@@ -32,6 +32,17 @@ const envSchema = z.object({
     .pipe(z.number().positive()),
   BCRYPT_SALT_ROUNDS: z.string().default('10').transform(Number).pipe(z.number().positive()),
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
+  // Public registration MVP
+  PLATA_MONO_API_KEY: z.string().optional(),
+  PLATA_MONO_WEBHOOK_SECRET: z.string().optional(),
+  PLATA_MONO_WEBHOOK_URL: z.string().default('http://localhost:5000/api/webhooks/plata-mono'),
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_FROM_EMAIL: z.string().optional(),
+  FRONTEND_URL: z.string().default('http://localhost:3000'),
+  FRONTEND_SUCCESS_URL: z.string().default('http://localhost:3000/registration/success'),
+  FRONTEND_FAILURE_URL: z.string().default('http://localhost:3000/registration/failed'),
+  SINGLE_EVENT_ID: z.string().optional(),
+  EVENT_BASE_PRICE: z.string().default('1000').transform(Number).pipe(z.number().nonnegative()),
 });
 
 // Validate environment variables
@@ -85,4 +96,27 @@ export const bcryptConfig = {
 
 export const logConfig = {
   level: config.LOG_LEVEL,
+};
+
+export const paymentConfig = {
+  plataApiKey: config.PLATA_MONO_API_KEY ?? '',
+  plataWebhookSecret: config.PLATA_MONO_WEBHOOK_SECRET ?? '',
+  currency: 'UAH',
+  webhookUrl: config.PLATA_MONO_WEBHOOK_URL,
+};
+
+export const emailConfig = {
+  resendApiKey: config.RESEND_API_KEY ?? '',
+  fromEmail: config.RESEND_FROM_EMAIL ?? 'noreply@example.com',
+};
+
+export const frontendConfig = {
+  url: config.FRONTEND_URL,
+  successUrl: config.FRONTEND_SUCCESS_URL,
+  failureUrl: config.FRONTEND_FAILURE_URL,
+};
+
+export const eventConfig = {
+  singleEventId: config.SINGLE_EVENT_ID,
+  basePrice: config.EVENT_BASE_PRICE,
 };

@@ -1,28 +1,33 @@
 import { Router } from 'express';
 import {
-  getEvents,
-  getEventById,
-  createEvent,
-  updateEvent,
-  deleteEvent,
-  getMyEvents,
   checkRegistration,
+  createEvent,
+  deleteEvent,
+  getEventById,
+  getEvents,
+  getMyEvents,
+  getSingleEvent,
+  updateEvent,
 } from '../controllers/events.controller';
-import { getEventRegistrations } from '../controllers/registrations.controller';
+import {
+  getEventRegistrations,
+  getPublicParticipants,
+} from '../controllers/registrations.controller';
 import { authenticate } from '../middleware/auth.middleware';
 import { isEventOrganizer } from '../middleware/authorization.middleware';
-import { validate, ValidationType } from '../middleware/validation.middleware';
+import { ValidationType, validate } from '../middleware/validation.middleware';
+import { asyncHandler } from '../utils/asyncHandler';
 import {
   createEventSchema,
-  updateEventSchema,
   eventIdSchema,
   getEventsQuerySchema,
+  updateEventSchema,
 } from '../validators/events.validator';
 import {
   eventIdParamSchema,
   getRegistrationsQuerySchema,
+  publicEventIdParamSchema,
 } from '../validators/registrations.validator';
-import { asyncHandler } from '../utils/asyncHandler';
 
 const router = Router();
 
@@ -31,6 +36,12 @@ const router = Router();
  * Get all events with filters and pagination (public)
  */
 router.get('/', validate(getEventsQuerySchema, ValidationType.QUERY), asyncHandler(getEvents));
+
+/**
+ * GET /api/events/single
+ * Get the single public event
+ */
+router.get('/single', asyncHandler(getSingleEvent));
 
 /**
  * GET /api/events/my
@@ -42,6 +53,16 @@ router.get(
   authenticate,
   validate(getEventsQuerySchema, ValidationType.QUERY),
   asyncHandler(getMyEvents)
+);
+
+/**
+ * GET /api/events/:eventId/participants
+ * Public participant list (confirmed only)
+ */
+router.get(
+  '/:eventId/participants',
+  validate(publicEventIdParamSchema, ValidationType.PARAMS),
+  asyncHandler(getPublicParticipants)
 );
 
 /**

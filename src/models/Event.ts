@@ -2,6 +2,12 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IEvent extends Document {
   _id: mongoose.Types.ObjectId;
+  translations?: {
+    title?: { en?: string; uk?: string };
+    description?: { en?: string; uk?: string };
+    location?: { en?: string; uk?: string };
+    speakers?: Array<{ en?: string; uk?: string }>;
+  };
   title: string;
   description: string;
   date: Date;
@@ -10,6 +16,9 @@ export interface IEvent extends Document {
   registeredCount: number;
   organizerId: mongoose.Types.ObjectId;
   imageUrl?: string;
+  basePrice?: number;
+  speakers?: string[];
+  gallery?: string[];
   createdAt: Date;
   updatedAt: Date;
   hasAvailableCapacity(): boolean;
@@ -17,6 +26,29 @@ export interface IEvent extends Document {
 
 const eventSchema = new Schema<IEvent>(
   {
+    translations: {
+      type: {
+        title: {
+          en: { type: String, trim: true },
+          uk: { type: String, trim: true },
+        },
+        description: {
+          en: { type: String, trim: true },
+          uk: { type: String, trim: true },
+        },
+        location: {
+          en: { type: String, trim: true },
+          uk: { type: String, trim: true },
+        },
+        speakers: [
+          {
+            en: { type: String, trim: true },
+            uk: { type: String, trim: true },
+          },
+        ],
+      },
+      default: undefined,
+    },
     title: {
       type: String,
       required: [true, 'Title is required'],
@@ -82,6 +114,31 @@ const eventSchema = new Schema<IEvent>(
           }
         },
         message: 'Image URL must be a valid URL',
+      },
+    },
+    basePrice: {
+      type: Number,
+      min: [0, 'Base price cannot be negative'],
+    },
+    speakers: {
+      type: [String],
+      default: [],
+    },
+    gallery: {
+      type: [String],
+      default: [],
+      validate: {
+        validator(values: string[]) {
+          return values.every(value => {
+            try {
+              new URL(value);
+              return true;
+            } catch {
+              return false;
+            }
+          });
+        },
+        message: 'Gallery items must be valid URLs',
       },
     },
   } as Record<string, unknown>,

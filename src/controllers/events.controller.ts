@@ -1,6 +1,31 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import eventsService from '../services/events.service';
+import eventsService, { UpdateEventInput } from '../services/events.service';
+
+const getRequestedLang = (req: Request): 'en' | 'uk' | undefined => {
+  const queryLang = (req.query.lang as string | undefined)?.toLowerCase();
+  if (queryLang === 'en' || queryLang === 'uk') return queryLang;
+  const headerLang = req.headers['accept-language'];
+  if (typeof headerLang === 'string') {
+    if (headerLang.toLowerCase().includes('uk')) return 'uk';
+    if (headerLang.toLowerCase().includes('en')) return 'en';
+  }
+  return undefined;
+};
+
+/**
+ * Get the single public event
+ * GET /api/events/single
+ */
+export const getSingleEvent = async (_req: Request, res: Response): Promise<void> => {
+  const lang = getRequestedLang(_req);
+  const event = await eventsService.getSingleEvent(lang);
+
+  res.status(200).json({
+    success: true,
+    data: event,
+  });
+};
 
 /**
  * Get all events with filters and pagination
@@ -8,6 +33,7 @@ import eventsService from '../services/events.service';
  */
 export const getEvents = async (req: Request, res: Response): Promise<void> => {
   const { search, startDate, endDate, location, page, limit } = req.query;
+  const lang = getRequestedLang(req);
 
   // Build filters object, only including defined values
   const filters: {
@@ -24,7 +50,8 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
   const result = await eventsService.getEvents(
     filters,
     page ? Number(page) : undefined,
-    limit ? Number(limit) : undefined
+    limit ? Number(limit) : undefined,
+    lang
   );
 
   res.status(200).json({
@@ -40,6 +67,7 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
  */
 export const getEventById = async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
+  const lang = getRequestedLang(req);
 
   if (!id) {
     res.status(400).json({
@@ -49,7 +77,7 @@ export const getEventById = async (req: Request, res: Response): Promise<void> =
     return;
   }
 
-  const event = await eventsService.getEventById(id);
+  const event = await eventsService.getEventById(id, lang);
 
   res.status(200).json({
     success: true,
@@ -63,15 +91,30 @@ export const getEventById = async (req: Request, res: Response): Promise<void> =
  */
 export const createEvent = async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user!.userId;
-  const { title, description, date, location, capacity, imageUrl } = req.body;
+  const {
+    translations,
+    title,
+    description,
+    date,
+    location,
+    capacity,
+    imageUrl,
+    basePrice,
+    speakers,
+    gallery,
+  } = req.body;
 
   const event = await eventsService.createEvent(userId, {
+    translations,
     title,
     description,
     date: new Date(date),
     location,
     capacity,
     imageUrl,
+    basePrice,
+    speakers,
+    gallery,
   });
 
   res.status(201).json({
@@ -87,7 +130,18 @@ export const createEvent = async (req: AuthRequest, res: Response): Promise<void
 export const updateEvent = async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
   const userId = req.user!.userId;
-  const { title, description, date, location, capacity, imageUrl } = req.body;
+  const {
+    translations,
+    title,
+    description,
+    date,
+    location,
+    capacity,
+    imageUrl,
+    basePrice,
+    speakers,
+    gallery,
+  } = req.body;
 
   if (!id) {
     res.status(400).json({
@@ -97,20 +151,17 @@ export const updateEvent = async (req: AuthRequest, res: Response): Promise<void
     return;
   }
 
-  const updateData: {
-    title?: string;
-    description?: string;
-    date?: Date;
-    location?: string;
-    capacity?: number;
-    imageUrl?: string;
-  } = {};
+  const updateData: UpdateEventInput = {};
+  if (translations !== undefined) updateData.translations = translations;
   if (title !== undefined) updateData.title = title;
   if (description !== undefined) updateData.description = description;
   if (date !== undefined) updateData.date = new Date(date);
   if (location !== undefined) updateData.location = location;
   if (capacity !== undefined) updateData.capacity = capacity;
   if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
+  if (basePrice !== undefined) updateData.basePrice = basePrice;
+  if (speakers !== undefined) updateData.speakers = speakers;
+  if (gallery !== undefined) updateData.gallery = gallery;
 
   const event = await eventsService.updateEvent(id, userId, updateData);
 
