@@ -55,7 +55,7 @@ export interface EventResponse {
   location: string;
   capacity: number;
   registeredCount: number;
-  organizerId: string;
+  organizerId?: string;
   imageUrl?: string;
   basePrice?: number;
   speakers?: string[];
@@ -325,7 +325,7 @@ class EventsService {
     location: string;
     capacity: number;
     registeredCount: number;
-    organizerId: mongoose.Types.ObjectId | { toString(): string };
+    organizerId?: mongoose.Types.ObjectId | { toString(): string };
     imageUrl?: string;
     basePrice?: number;
     speakers?: string[];
@@ -342,10 +342,12 @@ class EventsService {
       location: event.location,
       capacity: event.capacity,
       registeredCount: event.registeredCount,
-      organizerId: event.organizerId.toString(),
       createdAt: event.createdAt,
       updatedAt: event.updatedAt,
     };
+    if (event.organizerId !== undefined) {
+      response.organizerId = event.organizerId.toString();
+    }
     if (event.imageUrl !== undefined) {
       response.imageUrl = event.imageUrl;
     }
