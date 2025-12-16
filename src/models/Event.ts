@@ -2,6 +2,12 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IEvent extends Document {
   _id: mongoose.Types.ObjectId;
+  translations?: {
+    title?: { en?: string; uk?: string };
+    description?: { en?: string; uk?: string };
+    location?: { en?: string; uk?: string };
+    speakers?: Array<{ en?: string; uk?: string }>;
+  };
   title: string;
   description: string;
   date: Date;
@@ -20,6 +26,29 @@ export interface IEvent extends Document {
 
 const eventSchema = new Schema<IEvent>(
   {
+    translations: {
+      type: {
+        title: {
+          en: { type: String, trim: true },
+          uk: { type: String, trim: true },
+        },
+        description: {
+          en: { type: String, trim: true },
+          uk: { type: String, trim: true },
+        },
+        location: {
+          en: { type: String, trim: true },
+          uk: { type: String, trim: true },
+        },
+        speakers: [
+          {
+            en: { type: String, trim: true },
+            uk: { type: String, trim: true },
+          },
+        ],
+      },
+      default: undefined,
+    },
     title: {
       type: String,
       required: [true, 'Title is required'],

@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import { eventConfig } from '../config/env';
-import { Event } from '../models/Event';
+import { Event, IEvent } from '../models/Event';
 import { Registration } from '../models/Registration';
 import { ConflictError, ForbiddenError, NotFoundError } from '../types/errors';
 import {
@@ -9,11 +9,18 @@ import {
   getPaginationParams,
 } from '../utils/pagination.util';
 
+export type TranslationFields = {
+  title?: { en?: string; uk?: string };
+  description?: { en?: string; uk?: string };
+  location?: { en?: string; uk?: string };
+  speakers?: Array<{ en?: string; uk?: string }>;
+};
 export interface CreateEventInput {
-  title: string;
-  description: string;
+  translations: TranslationFields;
+  title?: string;
+  description?: string;
   date: Date;
-  location: string;
+  location?: string;
   capacity: number;
   imageUrl?: string;
   basePrice?: number;
@@ -22,6 +29,7 @@ export interface CreateEventInput {
 }
 
 export interface UpdateEventInput {
+  translations?: TranslationFields;
   title?: string;
   description?: string;
   date?: Date;
@@ -49,6 +57,7 @@ interface PopulatedOrganizer {
 
 export interface EventResponse {
   id: string;
+  translations: TranslationFields;
   title: string;
   description: string;
   date: Date;
@@ -63,6 +72,10 @@ export interface EventResponse {
   createdAt: Date;
   updatedAt: Date;
   organizer?: PopulatedOrganizer;
+  resolvedTitle?: string;
+  resolvedDescription?: string;
+  resolvedLocation?: string;
+  resolvedSpeakers?: string[];
 }
 
 class EventsService {
@@ -73,7 +86,8 @@ class EventsService {
   async getEvents(
     filters: EventFilters,
     page?: number,
-    limit?: number
+    limit?: number,
+    lang?: 'en' | 'uk'
   ): Promise<PaginatedResponse<EventResponse>> {
     const { page: parsedPage, limit: parsedLimit, skip } = getPaginationParams(page, limit);
 
@@ -119,7 +133,7 @@ class EventsService {
       .limit(parsedLimit)
       .lean();
 
-    const eventResponses = events.map(event => this.formatEventResponse(event));
+    const eventResponses = events.map(event => this.formatEventResponse(event, lang));
 
     return formatPaginatedResponse(eventResponses, total, parsedPage, parsedLimit);
   }
@@ -127,7 +141,7 @@ class EventsService {
   /**
    * Get the single configured event for the public MVP
    */
-  async getSingleEvent(): Promise<EventResponse> {
+  async getSingleEvent(lang?: 'en' | 'uk'): Promise<EventResponse> {
     let event = null;
 
     if (eventConfig.singleEventId && mongoose.Types.ObjectId.isValid(eventConfig.singleEventId)) {
@@ -142,14 +156,14 @@ class EventsService {
       throw new NotFoundError('Event not found');
     }
 
-    return this.formatEventResponse(event);
+    return this.formatEventResponse(event, lang);
   }
 
   /**
    * Get event by ID
    * Find by ID, populate organizer, throw NotFoundError if not exists
    */
-  async getEventById(id: string): Promise<EventResponse> {
+  async getEventById(id: string, lang?: 'en' | 'uk'): Promise<EventResponse> {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new NotFoundError('Invalid event ID');
     }
@@ -160,7 +174,7 @@ class EventsService {
       throw new NotFoundError('Event not found');
     }
 
-    return this.formatEventResponse(event);
+    return this.formatEventResponse(event, lang);
   }
 
   /**
@@ -173,9 +187,20 @@ class EventsService {
       throw new ConflictError('Event date must be in the future');
     }
 
+    const normalized = this.normalizeTranslationsForWrite(input);
+
     // Create event
     const event = await Event.create({
-      ...input,
+      translations: normalized.translations,
+      title: normalized.legacyTitle,
+      description: normalized.legacyDescription,
+      location: normalized.legacyLocation,
+      speakers: normalized.legacySpeakers,
+      date: input.date,
+      capacity: input.capacity,
+      imageUrl: input.imageUrl,
+      basePrice: input.basePrice,
+      gallery: input.gallery,
       organizerId: userId,
       registeredCount: 0,
     });
@@ -212,8 +237,9 @@ class EventsService {
       throw new ConflictError('Event date must be in the future');
     }
 
-    // Update event
-    Object.assign(event, input);
+    const merged = this.mergeTranslationsForUpdate(event.toObject(), input);
+
+    Object.assign(event, merged.updateFields);
     await event.save();
 
     // Populate organizer
@@ -317,25 +343,37 @@ class EventsService {
   /**
    * Format event document to response format
    */
-  private formatEventResponse(event: {
-    _id: mongoose.Types.ObjectId | { toString(): string };
-    title: string;
-    description: string;
-    date: Date;
-    location: string;
-    capacity: number;
-    registeredCount: number;
-    organizerId?: mongoose.Types.ObjectId | { toString(): string };
-    imageUrl?: string;
-    basePrice?: number;
-    speakers?: string[];
-    gallery?: string[];
-    createdAt: Date;
-    updatedAt: Date;
-    organizer?: PopulatedOrganizer;
-  }): EventResponse {
+  private formatEventResponse(
+    event: {
+      _id: mongoose.Types.ObjectId | { toString(): string };
+      translations?: {
+        title?: { en?: string; uk?: string };
+        description?: { en?: string; uk?: string };
+        location?: { en?: string; uk?: string };
+        speakers?: Array<{ en?: string; uk?: string }>;
+      };
+      title: string;
+      description: string;
+      date: Date;
+      location: string;
+      capacity: number;
+      registeredCount: number;
+      organizerId?: mongoose.Types.ObjectId | { toString(): string };
+      imageUrl?: string;
+      basePrice?: number;
+      speakers?: string[];
+      gallery?: string[];
+      createdAt: Date;
+      updatedAt: Date;
+      organizer?: PopulatedOrganizer;
+    },
+    lang?: 'en' | 'uk'
+  ): EventResponse {
+    const translations = this.buildTranslations(event);
+    const resolved = this.resolveByLang(translations, lang);
     const response: EventResponse = {
       id: event._id.toString(),
+      translations,
       title: event.title,
       description: event.description,
       date: event.date,
@@ -345,6 +383,10 @@ class EventsService {
       createdAt: event.createdAt,
       updatedAt: event.updatedAt,
     };
+    if (resolved.title !== undefined) response.resolvedTitle = resolved.title;
+    if (resolved.description !== undefined) response.resolvedDescription = resolved.description;
+    if (resolved.location !== undefined) response.resolvedLocation = resolved.location;
+    if (resolved.speakers !== undefined) response.resolvedSpeakers = resolved.speakers;
     if (event.organizerId !== undefined) {
       response.organizerId = event.organizerId.toString();
     }
@@ -364,6 +406,187 @@ class EventsService {
       response.organizer = event.organizer;
     }
     return response;
+  }
+
+  /**
+   * Normalize translations input to persist both translations and legacy fields
+   */
+  private normalizeTranslationsForWrite(input: CreateEventInput): {
+    translations: EventResponse['translations'];
+    legacyTitle: string;
+    legacyDescription: string;
+    legacyLocation: string;
+    legacySpeakers?: string[];
+  } {
+    const translations = input.translations;
+    const legacyTitle = input.title ?? translations.title?.en ?? '';
+    const legacyDescription = input.description ?? translations.description?.en ?? '';
+    const legacyLocation = input.location ?? translations.location?.en ?? '';
+    const legacySpeakers =
+      input.speakers ??
+      translations.speakers?.map(s => s.en).filter((val): val is string => !!val) ??
+      undefined;
+
+    const result: {
+      translations: EventResponse['translations'];
+      legacyTitle: string;
+      legacyDescription: string;
+      legacyLocation: string;
+      legacySpeakers?: string[];
+    } = {
+      translations,
+      legacyTitle,
+      legacyDescription,
+      legacyLocation,
+    };
+
+    if (legacySpeakers !== undefined) {
+      result.legacySpeakers = legacySpeakers;
+    }
+
+    return result;
+  }
+
+  /**
+   * Merge existing translations with update payload and keep legacy in sync
+   */
+  private mergeTranslationsForUpdate(
+    existing: {
+      translations?:
+        | {
+            title?: { en?: string; uk?: string };
+            description?: { en?: string; uk?: string };
+            location?: { en?: string; uk?: string };
+            speakers?: Array<{ en?: string; uk?: string }>;
+          }
+        | undefined;
+      title: string;
+      description: string;
+      location: string;
+      speakers?: string[];
+    },
+    input: UpdateEventInput
+  ): {
+    updateFields: Partial<IEvent>;
+  } {
+    const currentTranslations = this.buildTranslations(existing);
+
+    const mergedTranslations: EventResponse['translations'] = {
+      title: { ...(currentTranslations.title ?? {}), ...(input.translations?.title ?? {}) },
+      description: {
+        ...(currentTranslations.description ?? {}),
+        ...(input.translations?.description ?? {}),
+      },
+      location: {
+        ...(currentTranslations.location ?? {}),
+        ...(input.translations?.location ?? {}),
+      },
+    };
+    if (input.translations?.speakers !== undefined) {
+      mergedTranslations.speakers = input.translations.speakers;
+    } else if (currentTranslations.speakers !== undefined) {
+      mergedTranslations.speakers = currentTranslations.speakers;
+    }
+
+    const legacyTitle = input.title ?? mergedTranslations.title?.en ?? existing.title;
+    const legacyDescription =
+      input.description ?? mergedTranslations.description?.en ?? existing.description;
+    const legacyLocation = input.location ?? mergedTranslations.location?.en ?? existing.location;
+    const legacySpeakers =
+      input.speakers ??
+      (mergedTranslations.speakers
+        ? mergedTranslations.speakers.map(s => s.en).filter((val): val is string => !!val)
+        : existing.speakers);
+
+    const updateFields: Partial<IEvent> = {
+      translations: mergedTranslations,
+      title: legacyTitle,
+      description: legacyDescription,
+      location: legacyLocation,
+    };
+    if (legacySpeakers !== undefined) {
+      updateFields.speakers = legacySpeakers;
+    }
+    if (input.date !== undefined) updateFields.date = input.date;
+    if (input.capacity !== undefined) updateFields.capacity = input.capacity;
+    if (input.imageUrl !== undefined) updateFields.imageUrl = input.imageUrl;
+    if (input.basePrice !== undefined) updateFields.basePrice = input.basePrice;
+    if (input.gallery !== undefined) updateFields.gallery = input.gallery;
+
+    return { updateFields };
+  }
+
+  /**
+   * Build a consistent translations object from stored doc with fallbacks
+   */
+  private buildTranslations(event: {
+    translations?:
+      | {
+          title?: { en?: string; uk?: string };
+          description?: { en?: string; uk?: string };
+          location?: { en?: string; uk?: string };
+          speakers?: Array<{ en?: string; uk?: string }>;
+        }
+      | undefined;
+    title: string;
+    description: string;
+    location: string;
+    speakers?: string[];
+  }): EventResponse['translations'] {
+    const t: TranslationFields = (event.translations ?? {}) as TranslationFields;
+    const speakers =
+      t.speakers ?? (event.speakers ? event.speakers.map(s => ({ en: s })) : undefined);
+    const translations: EventResponse['translations'] = {
+      title: {
+        en: t.title?.en ?? event.title,
+        uk: t.title?.uk ?? '',
+      },
+      description: {
+        en: t.description?.en ?? event.description,
+        uk: t.description?.uk ?? '',
+      },
+      location: {
+        en: t.location?.en ?? event.location,
+        uk: t.location?.uk ?? '',
+      },
+    };
+    if (speakers !== undefined) {
+      translations.speakers = speakers;
+    }
+    return translations;
+  }
+
+  /**
+   * Resolve locale-aware fields based on lang with English fallback
+   */
+  private resolveByLang(
+    translations: EventResponse['translations'],
+    lang?: 'en' | 'uk'
+  ): {
+    title?: string;
+    description?: string;
+    location?: string;
+    speakers?: string[];
+  } {
+    const pick = (en?: string, uk?: string) => {
+      if (lang === 'uk' && uk && uk.trim().length > 0) return uk;
+      return en;
+    };
+
+    const speakers =
+      translations.speakers?.map(s => pick(s.en, s.uk)).filter((v): v is string => !!v) ??
+      undefined;
+
+    const result: { title?: string; description?: string; location?: string; speakers?: string[] } =
+      {};
+    const title = pick(translations.title?.en, translations.title?.uk);
+    const description = pick(translations.description?.en, translations.description?.uk);
+    const location = pick(translations.location?.en, translations.location?.uk);
+    if (title !== undefined) result.title = title;
+    if (description !== undefined) result.description = description;
+    if (location !== undefined) result.location = location;
+    if (speakers !== undefined) result.speakers = speakers;
+    return result;
   }
 }
 

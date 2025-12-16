@@ -4,7 +4,7 @@ import cloudinary from '../cloudinary';
 
 const router = express.Router();
 
-router.get('/signature', (req, res) => {
+router.get('/signature', (_req, res) => {
   const timestamp = Math.round(Date.now() / 1000);
 
   const signature = cloudinary.utils.api_sign_request(
