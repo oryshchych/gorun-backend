@@ -1,17 +1,18 @@
-import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import express, { Application, NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import { corsConfig } from './config/env';
 import { logger } from './config/logger';
 import { swaggerSpec } from './config/swagger';
-import { apiLimiter, authLimiter } from './middleware/rateLimiter.middleware';
 import { errorHandler } from './middleware/error.middleware';
 import { notFoundHandler } from './middleware/notFound.middleware';
+import { apiLimiter, authLimiter } from './middleware/rateLimiter.middleware';
 import authRoutes from './routes/auth.routes';
+import cloudinaryRoutes from './routes/cloudinary.routes';
 import eventsRoutes from './routes/events.routes';
-import registrationsRoutes from './routes/registrations.routes';
 import promoCodeRoutes from './routes/promoCodes.routes';
+import registrationsRoutes from './routes/registrations.routes';
 import webhooksRoutes from './routes/webhooks.routes';
 
 /**
@@ -110,6 +111,9 @@ const createApp = (): Application => {
 
   // Promo code validation
   app.use('/api/promo-codes', apiLimiter, promoCodeRoutes);
+
+  // Cloudinary routes
+  app.use('/api/cloudinary', cloudinaryRoutes);
 
   // Webhooks (no rate limit)
   app.use('/api/webhooks', webhooksRoutes);
