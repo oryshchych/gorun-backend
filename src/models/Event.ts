@@ -7,6 +7,7 @@ export interface IEvent extends Document {
     description?: { en?: string; uk?: string };
     location?: { en?: string; uk?: string };
     speakers?: Array<{ en?: string; uk?: string }>;
+    date?: { en?: string; uk?: string };
   };
   title: string;
   description: string;
@@ -19,6 +20,10 @@ export interface IEvent extends Document {
   basePrice?: number;
   speakers?: string[];
   gallery?: string[];
+  map?: {
+    latitude?: number;
+    longitude?: number;
+  };
   createdAt: Date;
   updatedAt: Date;
   hasAvailableCapacity(): boolean;
@@ -46,6 +51,10 @@ const eventSchema = new Schema<IEvent>(
             uk: { type: String, trim: true },
           },
         ],
+        date: {
+          en: { type: String, trim: true },
+          uk: { type: String, trim: true },
+        },
       },
       default: undefined,
     },
@@ -140,6 +149,13 @@ const eventSchema = new Schema<IEvent>(
         },
         message: 'Gallery items must be valid URLs',
       },
+    },
+    map: {
+      type: {
+        latitude: { type: Number },
+        longitude: { type: Number },
+      },
+      default: undefined,
     },
   } as Record<string, unknown>,
   {

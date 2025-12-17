@@ -14,6 +14,7 @@ export type TranslationFields = {
   description?: { en?: string; uk?: string };
   location?: { en?: string; uk?: string };
   speakers?: Array<{ en?: string; uk?: string }>;
+  date?: { en?: string; uk?: string };
 };
 export interface CreateEventInput {
   translations: TranslationFields;
@@ -26,6 +27,10 @@ export interface CreateEventInput {
   basePrice?: number;
   speakers?: string[];
   gallery?: string[];
+  map?: {
+    latitude?: number;
+    longitude?: number;
+  };
 }
 
 export interface UpdateEventInput {
@@ -39,6 +44,10 @@ export interface UpdateEventInput {
   basePrice?: number;
   speakers?: string[];
   gallery?: string[];
+  map?: {
+    latitude?: number;
+    longitude?: number;
+  };
 }
 
 export interface EventFilters {
@@ -69,6 +78,10 @@ export interface EventResponse {
   basePrice?: number;
   speakers?: string[];
   gallery?: string[];
+  map?: {
+    latitude?: number;
+    longitude?: number;
+  };
   createdAt: Date;
   updatedAt: Date;
   organizer?: PopulatedOrganizer;
@@ -76,6 +89,7 @@ export interface EventResponse {
   resolvedDescription?: string;
   resolvedLocation?: string;
   resolvedSpeakers?: string[];
+  resolvedDate?: string;
 }
 
 class EventsService {
@@ -201,6 +215,7 @@ class EventsService {
       imageUrl: input.imageUrl,
       basePrice: input.basePrice,
       gallery: input.gallery,
+      map: input.map,
       organizerId: userId,
       registeredCount: 0,
     });
@@ -363,6 +378,10 @@ class EventsService {
       basePrice?: number;
       speakers?: string[];
       gallery?: string[];
+      map?: {
+        latitude?: number;
+        longitude?: number;
+      };
       createdAt: Date;
       updatedAt: Date;
       organizer?: PopulatedOrganizer;
@@ -402,9 +421,13 @@ class EventsService {
     if (event.gallery !== undefined) {
       response.gallery = event.gallery;
     }
+    if (event.map !== undefined) {
+      response.map = event.map;
+    }
     if (event.organizer !== undefined) {
       response.organizer = event.organizer;
     }
+    if (resolved.date !== undefined) response.resolvedDate = resolved.date;
     return response;
   }
 
@@ -481,6 +504,7 @@ class EventsService {
         ...(currentTranslations.location ?? {}),
         ...(input.translations?.location ?? {}),
       },
+      date: { ...(currentTranslations.date ?? {}), ...(input.translations?.date ?? {}) },
     };
     if (input.translations?.speakers !== undefined) {
       mergedTranslations.speakers = input.translations.speakers;
@@ -512,6 +536,7 @@ class EventsService {
     if (input.imageUrl !== undefined) updateFields.imageUrl = input.imageUrl;
     if (input.basePrice !== undefined) updateFields.basePrice = input.basePrice;
     if (input.gallery !== undefined) updateFields.gallery = input.gallery;
+    if (input.map !== undefined) updateFields.map = input.map;
 
     return { updateFields };
   }
@@ -526,6 +551,7 @@ class EventsService {
           description?: { en?: string; uk?: string };
           location?: { en?: string; uk?: string };
           speakers?: Array<{ en?: string; uk?: string }>;
+          date?: { en?: string; uk?: string };
         }
       | undefined;
     title: string;
@@ -549,6 +575,10 @@ class EventsService {
         en: t.location?.en ?? event.location,
         uk: t.location?.uk ?? '',
       },
+      date: {
+        en: t.date?.en ?? '',
+        uk: t.date?.uk ?? '',
+      },
     };
     if (speakers !== undefined) {
       translations.speakers = speakers;
@@ -567,6 +597,7 @@ class EventsService {
     description?: string;
     location?: string;
     speakers?: string[];
+    date?: string;
   } {
     const pick = (en?: string, uk?: string) => {
       if (lang === 'uk' && uk && uk.trim().length > 0) return uk;
@@ -577,15 +608,22 @@ class EventsService {
       translations.speakers?.map(s => pick(s.en, s.uk)).filter((v): v is string => !!v) ??
       undefined;
 
-    const result: { title?: string; description?: string; location?: string; speakers?: string[] } =
-      {};
+    const result: {
+      title?: string;
+      description?: string;
+      location?: string;
+      speakers?: string[];
+      date?: string;
+    } = {};
     const title = pick(translations.title?.en, translations.title?.uk);
     const description = pick(translations.description?.en, translations.description?.uk);
     const location = pick(translations.location?.en, translations.location?.uk);
+    const date = pick(translations.date?.en, translations.date?.uk);
     if (title !== undefined) result.title = title;
     if (description !== undefined) result.description = description;
     if (location !== undefined) result.location = location;
     if (speakers !== undefined) result.speakers = speakers;
+    if (date !== undefined) result.date = date;
     return result;
   }
 }

@@ -49,6 +49,12 @@ const translationsSchema = z.object({
       })
     )
     .optional(),
+  date: z
+    .object({
+      en: z.string().trim().optional(),
+      uk: z.string().trim().optional(),
+    })
+    .optional(),
 });
 
 export const createEventSchema = z.object({
@@ -73,6 +79,12 @@ export const createEventSchema = z.object({
   imageUrl: z.url({ message: 'Invalid URL format' }).optional(),
   basePrice: z.number().nonnegative({ message: 'Base price cannot be negative' }).optional(),
   gallery: z.array(z.string().url({ message: 'Gallery items must be valid URLs' })).optional(),
+  map: z
+    .object({
+      latitude: z.number().optional(),
+      longitude: z.number().optional(),
+    })
+    .optional(),
 });
 
 export const updateEventSchema = z.object({
@@ -103,6 +115,12 @@ export const updateEventSchema = z.object({
   basePrice: z.number().nonnegative({ message: 'Base price cannot be negative' }).optional(),
   speakers: z.array(z.string().min(1)).optional(),
   gallery: z.array(z.string().url({ message: 'Gallery items must be valid URLs' })).optional(),
+  map: z
+    .object({
+      latitude: z.number().optional(),
+      longitude: z.number().optional(),
+    })
+    .optional(),
 });
 
 export const eventIdSchema = z.object({
