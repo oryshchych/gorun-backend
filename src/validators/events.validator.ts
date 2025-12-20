@@ -12,6 +12,47 @@ const localeString = (min: number, max: number) =>
       message: `Must be at least ${min} characters or empty`,
     });
 
+const translationFieldSchema = z.object({
+  en: z.string().trim().optional(),
+  uk: z.string().trim().optional(),
+});
+
+const speakerTranslationsSchema = z.object({
+  fullname: translationFieldSchema.optional(),
+  shortDescription: translationFieldSchema.optional(),
+  description: translationFieldSchema.optional(),
+});
+
+const speakerSchema = z.object({
+  id: z.string().optional(),
+  translations: speakerTranslationsSchema.optional(),
+  fullname: z
+    .string()
+    .trim()
+    .min(1, { message: 'Fullname must be at least 1 character' })
+    .max(200, { message: 'Fullname must not exceed 200 characters' }),
+  shortDescription: z
+    .string()
+    .trim()
+    .min(1, { message: 'Short description must be at least 1 character' })
+    .max(500, { message: 'Short description must not exceed 500 characters' }),
+  description: z
+    .string()
+    .trim()
+    .min(1, { message: 'Description must be at least 1 character' })
+    .max(2000, { message: 'Description must not exceed 2000 characters' }),
+  image: z
+    .string()
+    .trim()
+    .url({ message: 'Image must be a valid URL' })
+    .min(1, { message: 'Image URL is required' }),
+  instagramLink: z
+    .string()
+    .trim()
+    .url({ message: 'Instagram link must be a valid URL' })
+    .min(1, { message: 'Instagram link is required' }),
+});
+
 const translationsSchema = z.object({
   title: z.object({
     en: z
@@ -63,7 +104,7 @@ export const createEventSchema = z.object({
   title: z.string().optional(),
   description: z.string().optional(),
   location: z.string().optional(),
-  speakers: z.array(z.string().min(1)).optional(),
+  speakers: z.array(speakerSchema).optional(),
   date: z
     .string()
     .or(z.date())
@@ -113,7 +154,7 @@ export const updateEventSchema = z.object({
     .optional(),
   imageUrl: z.url({ message: 'Invalid URL format' }).optional(),
   basePrice: z.number().nonnegative({ message: 'Base price cannot be negative' }).optional(),
-  speakers: z.array(z.string().min(1)).optional(),
+  speakers: z.array(speakerSchema).optional(),
   gallery: z.array(z.string().url({ message: 'Gallery items must be valid URLs' })).optional(),
   map: z
     .object({

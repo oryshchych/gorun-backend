@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import { eventConfig } from '../config/env';
-import { Event, IEvent } from '../models/Event';
+import { Event, IEvent, Speaker } from '../models/Event';
 import { Registration } from '../models/Registration';
 import { ConflictError, ForbiddenError, NotFoundError } from '../types/errors';
 import {
@@ -25,7 +25,7 @@ export interface CreateEventInput {
   capacity: number;
   imageUrl?: string;
   basePrice?: number;
-  speakers?: string[];
+  speakers?: Speaker[];
   gallery?: string[];
   map?: {
     latitude?: number;
@@ -42,7 +42,7 @@ export interface UpdateEventInput {
   capacity?: number;
   imageUrl?: string;
   basePrice?: number;
-  speakers?: string[];
+  speakers?: Speaker[];
   gallery?: string[];
   map?: {
     latitude?: number;
@@ -76,7 +76,7 @@ export interface EventResponse {
   organizerId?: string;
   imageUrl?: string;
   basePrice?: number;
-  speakers?: string[];
+  speakers?: Speaker[];
   gallery?: string[];
   map?: {
     latitude?: number;
@@ -209,7 +209,7 @@ class EventsService {
       title: normalized.legacyTitle,
       description: normalized.legacyDescription,
       location: normalized.legacyLocation,
-      speakers: normalized.legacySpeakers,
+      speakers: normalized.speakers,
       date: input.date,
       capacity: input.capacity,
       imageUrl: input.imageUrl,
@@ -361,30 +361,34 @@ class EventsService {
   private formatEventResponse(
     event: {
       _id: mongoose.Types.ObjectId | { toString(): string };
-      translations?: {
-        title?: { en?: string; uk?: string };
-        description?: { en?: string; uk?: string };
-        location?: { en?: string; uk?: string };
-        speakers?: Array<{ en?: string; uk?: string }>;
-      };
+      translations?:
+        | {
+            title?: { en?: string; uk?: string };
+            description?: { en?: string; uk?: string };
+            location?: { en?: string; uk?: string };
+            speakers?: Array<{ en?: string; uk?: string }>;
+          }
+        | undefined;
       title: string;
       description: string;
       date: Date;
       location: string;
       capacity: number;
       registeredCount: number;
-      organizerId?: mongoose.Types.ObjectId | { toString(): string };
-      imageUrl?: string;
-      basePrice?: number;
-      speakers?: string[];
-      gallery?: string[];
-      map?: {
-        latitude?: number;
-        longitude?: number;
-      };
+      organizerId?: mongoose.Types.ObjectId | { toString(): string } | undefined;
+      imageUrl?: string | undefined;
+      basePrice?: number | undefined;
+      speakers?: Speaker[] | undefined;
+      gallery?: string[] | undefined;
+      map?:
+        | {
+            latitude?: number;
+            longitude?: number;
+          }
+        | undefined;
       createdAt: Date;
       updatedAt: Date;
-      organizer?: PopulatedOrganizer;
+      organizer?: PopulatedOrganizer | undefined;
     },
     lang?: 'en' | 'uk'
   ): EventResponse {
@@ -439,23 +443,20 @@ class EventsService {
     legacyTitle: string;
     legacyDescription: string;
     legacyLocation: string;
-    legacySpeakers?: string[];
+    speakers?: Speaker[];
   } {
     const translations = input.translations;
     const legacyTitle = input.title ?? translations.title?.en ?? '';
     const legacyDescription = input.description ?? translations.description?.en ?? '';
     const legacyLocation = input.location ?? translations.location?.en ?? '';
-    const legacySpeakers =
-      input.speakers ??
-      translations.speakers?.map(s => s.en).filter((val): val is string => !!val) ??
-      undefined;
+    const speakers = input.speakers ?? undefined;
 
     const result: {
       translations: EventResponse['translations'];
       legacyTitle: string;
       legacyDescription: string;
       legacyLocation: string;
-      legacySpeakers?: string[];
+      speakers?: Speaker[];
     } = {
       translations,
       legacyTitle,
@@ -463,8 +464,8 @@ class EventsService {
       legacyLocation,
     };
 
-    if (legacySpeakers !== undefined) {
-      result.legacySpeakers = legacySpeakers;
+    if (speakers !== undefined) {
+      result.speakers = speakers;
     }
 
     return result;
@@ -486,7 +487,7 @@ class EventsService {
       title: string;
       description: string;
       location: string;
-      speakers?: string[];
+      speakers?: Speaker[];
     },
     input: UpdateEventInput
   ): {
@@ -516,11 +517,7 @@ class EventsService {
     const legacyDescription =
       input.description ?? mergedTranslations.description?.en ?? existing.description;
     const legacyLocation = input.location ?? mergedTranslations.location?.en ?? existing.location;
-    const legacySpeakers =
-      input.speakers ??
-      (mergedTranslations.speakers
-        ? mergedTranslations.speakers.map(s => s.en).filter((val): val is string => !!val)
-        : existing.speakers);
+    const speakers = input.speakers ?? existing.speakers;
 
     const updateFields: Partial<IEvent> = {
       translations: mergedTranslations,
@@ -528,8 +525,8 @@ class EventsService {
       description: legacyDescription,
       location: legacyLocation,
     };
-    if (legacySpeakers !== undefined) {
-      updateFields.speakers = legacySpeakers;
+    if (speakers !== undefined) {
+      updateFields.speakers = speakers;
     }
     if (input.date !== undefined) updateFields.date = input.date;
     if (input.capacity !== undefined) updateFields.capacity = input.capacity;
@@ -557,11 +554,22 @@ class EventsService {
     title: string;
     description: string;
     location: string;
-    speakers?: string[];
+    speakers?: Speaker[] | undefined;
   }): EventResponse['translations'] {
     const t: TranslationFields = (event.translations ?? {}) as TranslationFields;
     const speakers =
-      t.speakers ?? (event.speakers ? event.speakers.map(s => ({ en: s })) : undefined);
+      t.speakers ??
+      (event.speakers
+        ? event.speakers.map(s => {
+            const result: { en?: string; uk?: string } = {
+              en: s.translations?.fullname?.en ?? s.fullname,
+            };
+            if (s.translations?.fullname?.uk !== undefined) {
+              result.uk = s.translations.fullname.uk;
+            }
+            return result;
+          })
+        : undefined);
     const translations: EventResponse['translations'] = {
       title: {
         en: t.title?.en ?? event.title,
