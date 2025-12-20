@@ -145,6 +145,75 @@ const options: swaggerJsdoc.Options = {
           },
         },
         // Event schemas
+        TranslationField: {
+          type: 'object',
+          properties: {
+            en: {
+              type: 'string',
+              description: 'English translation',
+            },
+            uk: {
+              type: 'string',
+              description: 'Ukrainian translation',
+            },
+          },
+        },
+        SpeakerTranslations: {
+          type: 'object',
+          properties: {
+            fullname: {
+              $ref: '#/components/schemas/TranslationField',
+            },
+            shortDescription: {
+              $ref: '#/components/schemas/TranslationField',
+            },
+            description: {
+              $ref: '#/components/schemas/TranslationField',
+            },
+          },
+        },
+        Speaker: {
+          type: 'object',
+          required: ['fullname', 'shortDescription', 'description', 'image', 'instagramLink'],
+          properties: {
+            id: {
+              type: 'string',
+              description: 'Speaker ID',
+              example: '507f1f77bcf86cd799439011',
+            },
+            translations: {
+              $ref: '#/components/schemas/SpeakerTranslations',
+            },
+            fullname: {
+              type: 'string',
+              description: 'Speaker full name',
+              example: 'John Doe',
+            },
+            shortDescription: {
+              type: 'string',
+              description: 'Short description of the speaker',
+              example: 'Tech industry expert',
+            },
+            description: {
+              type: 'string',
+              description: 'Full description of the speaker',
+              example:
+                'John Doe is a renowned expert in technology with over 20 years of experience.',
+            },
+            image: {
+              type: 'string',
+              format: 'uri',
+              description: 'Speaker image URL',
+              example: 'https://example.com/speaker-image.jpg',
+            },
+            instagramLink: {
+              type: 'string',
+              format: 'uri',
+              description: 'Speaker Instagram profile URL',
+              example: 'https://instagram.com/johndoe',
+            },
+          },
+        },
         Event: {
           type: 'object',
           properties: {
@@ -207,9 +276,10 @@ const options: swaggerJsdoc.Options = {
             },
             speakers: {
               type: 'array',
-              items: { type: 'string' },
+              items: {
+                $ref: '#/components/schemas/Speaker',
+              },
               description: 'List of speakers',
-              example: ['Speaker 1', 'Speaker 2'],
             },
             gallery: {
               type: 'array',

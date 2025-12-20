@@ -1,5 +1,26 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
+export interface TranslationField {
+  en?: string;
+  uk?: string;
+}
+
+export interface SpeakerTranslations {
+  fullname?: TranslationField;
+  shortDescription?: TranslationField;
+  description?: TranslationField;
+}
+
+export interface Speaker {
+  id?: string;
+  translations?: SpeakerTranslations;
+  fullname: string;
+  shortDescription: string;
+  description: string;
+  image: string;
+  instagramLink: string;
+}
+
 export interface IEvent extends Document {
   _id: mongoose.Types.ObjectId;
   translations?: {
@@ -7,6 +28,7 @@ export interface IEvent extends Document {
     description?: { en?: string; uk?: string };
     location?: { en?: string; uk?: string };
     speakers?: Array<{ en?: string; uk?: string }>;
+    date?: { en?: string; uk?: string };
   };
   title: string;
   description: string;
@@ -17,8 +39,12 @@ export interface IEvent extends Document {
   organizerId: mongoose.Types.ObjectId;
   imageUrl?: string;
   basePrice?: number;
-  speakers?: string[];
+  speakers?: Speaker[];
   gallery?: string[];
+  map?: {
+    latitude?: number;
+    longitude?: number;
+  };
   createdAt: Date;
   updatedAt: Date;
   hasAvailableCapacity(): boolean;
@@ -46,6 +72,10 @@ const eventSchema = new Schema<IEvent>(
             uk: { type: String, trim: true },
           },
         ],
+        date: {
+          en: { type: String, trim: true },
+          uk: { type: String, trim: true },
+        },
       },
       default: undefined,
     },
@@ -121,7 +151,33 @@ const eventSchema = new Schema<IEvent>(
       min: [0, 'Base price cannot be negative'],
     },
     speakers: {
-      type: [String],
+      type: [
+        {
+          id: { type: String },
+          translations: {
+            type: {
+              fullname: {
+                en: { type: String, trim: true },
+                uk: { type: String, trim: true },
+              },
+              shortDescription: {
+                en: { type: String, trim: true },
+                uk: { type: String, trim: true },
+              },
+              description: {
+                en: { type: String, trim: true },
+                uk: { type: String, trim: true },
+              },
+            },
+            default: undefined,
+          },
+          fullname: { type: String, required: true, trim: true },
+          shortDescription: { type: String, required: true, trim: true },
+          description: { type: String, required: true, trim: true },
+          image: { type: String, required: true, trim: true },
+          instagramLink: { type: String, required: true, trim: true },
+        },
+      ],
       default: [],
     },
     gallery: {
@@ -140,6 +196,13 @@ const eventSchema = new Schema<IEvent>(
         },
         message: 'Gallery items must be valid URLs',
       },
+    },
+    map: {
+      type: {
+        latitude: { type: Number },
+        longitude: { type: Number },
+      },
+      default: undefined,
     },
   } as Record<string, unknown>,
   {
