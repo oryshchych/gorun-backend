@@ -263,6 +263,55 @@ const options: swaggerJsdoc.Options = {
             organizer: {
               $ref: '#/components/schemas/User',
             },
+            translations: {
+              type: 'object',
+              description: 'Multilingual translations for event fields',
+              properties: {
+                title: {
+                  $ref: '#/components/schemas/TranslationField',
+                },
+                description: {
+                  $ref: '#/components/schemas/TranslationField',
+                },
+                location: {
+                  $ref: '#/components/schemas/TranslationField',
+                },
+                speakers: {
+                  type: 'array',
+                  items: {
+                    $ref: '#/components/schemas/TranslationField',
+                  },
+                },
+                date: {
+                  $ref: '#/components/schemas/TranslationField',
+                },
+                partners: {
+                  type: 'array',
+                  description: 'Event partners with translations and images',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      en: {
+                        type: 'string',
+                        description: 'Partner name in English (optional)',
+                        example: 'Tech Sponsor Inc.',
+                      },
+                      uk: {
+                        type: 'string',
+                        description: 'Partner name in Ukrainian (optional)',
+                        example: 'Тех Спонсор Інк.',
+                      },
+                      imageUrl: {
+                        type: 'string',
+                        format: 'uri',
+                        description: 'Partner logo/image URL (optional)',
+                        example: 'https://example.com/partner-logo.jpg',
+                      },
+                    },
+                  },
+                },
+              },
+            },
             imageUrl: {
               type: 'object',
               description: 'Event image URLs',

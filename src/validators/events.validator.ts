@@ -96,6 +96,15 @@ const translationsSchema = z.object({
       uk: z.string().trim().optional(),
     })
     .optional(),
+  partners: z
+    .array(
+      z.object({
+        en: z.string().trim().optional(),
+        uk: z.string().trim().optional(),
+        imageUrl: z.string().url({ message: 'Partner image URL must be a valid URL' }).optional(),
+      })
+    )
+    .optional(),
 });
 
 export const createEventSchema = z.object({
