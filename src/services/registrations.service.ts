@@ -49,7 +49,10 @@ interface PopulatedEvent {
   capacity: number;
   registeredCount: number;
   organizerId: mongoose.Types.ObjectId;
-  imageUrl?: string;
+  imageUrl?: {
+    portrait: string;
+    landscape: string;
+  };
   createdAt: Date;
   updatedAt: Date;
 }

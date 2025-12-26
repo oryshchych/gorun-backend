@@ -264,10 +264,22 @@ const options: swaggerJsdoc.Options = {
               $ref: '#/components/schemas/User',
             },
             imageUrl: {
-              type: 'string',
-              format: 'uri',
-              description: 'Event image URL',
-              example: 'https://example.com/event-image.jpg',
+              type: 'object',
+              description: 'Event image URLs',
+              properties: {
+                portrait: {
+                  type: 'string',
+                  format: 'uri',
+                  description: 'Portrait orientation image URL',
+                  example: 'https://example.com/event-image-portrait.jpg',
+                },
+                landscape: {
+                  type: 'string',
+                  format: 'uri',
+                  description: 'Landscape orientation image URL',
+                  example: 'https://example.com/event-image-landscape.jpg',
+                },
+              },
             },
             basePrice: {
               type: 'number',
@@ -337,10 +349,22 @@ const options: swaggerJsdoc.Options = {
               example: 500,
             },
             imageUrl: {
-              type: 'string',
-              format: 'uri',
-              description: 'Event image URL (optional)',
-              example: 'https://example.com/event-image.jpg',
+              type: 'object',
+              description: 'Event image URLs (optional)',
+              properties: {
+                portrait: {
+                  type: 'string',
+                  format: 'uri',
+                  description: 'Portrait orientation image URL',
+                  example: 'https://example.com/event-image-portrait.jpg',
+                },
+                landscape: {
+                  type: 'string',
+                  format: 'uri',
+                  description: 'Landscape orientation image URL',
+                  example: 'https://example.com/event-image-landscape.jpg',
+                },
+              },
             },
           },
         },
@@ -382,10 +406,22 @@ const options: swaggerJsdoc.Options = {
               example: 500,
             },
             imageUrl: {
-              type: 'string',
-              format: 'uri',
-              description: 'Event image URL',
-              example: 'https://example.com/event-image.jpg',
+              type: 'object',
+              description: 'Event image URLs',
+              properties: {
+                portrait: {
+                  type: 'string',
+                  format: 'uri',
+                  description: 'Portrait orientation image URL',
+                  example: 'https://example.com/event-image-portrait.jpg',
+                },
+                landscape: {
+                  type: 'string',
+                  format: 'uri',
+                  description: 'Landscape orientation image URL',
+                  example: 'https://example.com/event-image-landscape.jpg',
+                },
+              },
             },
           },
         },

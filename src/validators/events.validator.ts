@@ -117,7 +117,12 @@ export const createEventSchema = z.object({
     .int({ message: 'Capacity must be an integer' })
     .min(1, { message: 'Capacity must be at least 1' })
     .max(10000, { message: 'Capacity must not exceed 10000' }),
-  imageUrl: z.url({ message: 'Invalid URL format' }).optional(),
+  imageUrl: z
+    .object({
+      portrait: z.string().url({ message: 'Portrait image URL must be a valid URL' }),
+      landscape: z.string().url({ message: 'Landscape image URL must be a valid URL' }),
+    })
+    .optional(),
   basePrice: z.number().nonnegative({ message: 'Base price cannot be negative' }).optional(),
   gallery: z.array(z.string().url({ message: 'Gallery items must be valid URLs' })).optional(),
   map: z
@@ -152,7 +157,12 @@ export const updateEventSchema = z.object({
     .min(1, { message: 'Capacity must be at least 1' })
     .max(10000, { message: 'Capacity must not exceed 10000' })
     .optional(),
-  imageUrl: z.url({ message: 'Invalid URL format' }).optional(),
+  imageUrl: z
+    .object({
+      portrait: z.string().url({ message: 'Portrait image URL must be a valid URL' }),
+      landscape: z.string().url({ message: 'Landscape image URL must be a valid URL' }),
+    })
+    .optional(),
   basePrice: z.number().nonnegative({ message: 'Base price cannot be negative' }).optional(),
   speakers: z.array(speakerSchema).optional(),
   gallery: z.array(z.string().url({ message: 'Gallery items must be valid URLs' })).optional(),

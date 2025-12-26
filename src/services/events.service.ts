@@ -23,7 +23,10 @@ export interface CreateEventInput {
   date: Date;
   location?: string;
   capacity: number;
-  imageUrl?: string;
+  imageUrl?: {
+    portrait: string;
+    landscape: string;
+  };
   basePrice?: number;
   speakers?: Speaker[];
   gallery?: string[];
@@ -40,7 +43,10 @@ export interface UpdateEventInput {
   date?: Date;
   location?: string;
   capacity?: number;
-  imageUrl?: string;
+  imageUrl?: {
+    portrait: string;
+    landscape: string;
+  };
   basePrice?: number;
   speakers?: Speaker[];
   gallery?: string[];
@@ -74,7 +80,10 @@ export interface EventResponse {
   capacity: number;
   registeredCount: number;
   organizerId?: string;
-  imageUrl?: string;
+  imageUrl?: {
+    portrait: string;
+    landscape: string;
+  };
   basePrice?: number;
   speakers?: Speaker[];
   gallery?: string[];
@@ -376,7 +385,12 @@ class EventsService {
       capacity: number;
       registeredCount: number;
       organizerId?: mongoose.Types.ObjectId | { toString(): string } | undefined;
-      imageUrl?: string | undefined;
+      imageUrl?:
+        | {
+            portrait: string;
+            landscape: string;
+          }
+        | undefined;
       basePrice?: number | undefined;
       speakers?: Speaker[] | undefined;
       gallery?: string[] | undefined;
