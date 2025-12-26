@@ -37,7 +37,10 @@ export interface IEvent extends Document {
   capacity: number;
   registeredCount: number;
   organizerId: mongoose.Types.ObjectId;
-  imageUrl?: string;
+  imageUrl?: {
+    portrait: string;
+    landscape: string;
+  };
   basePrice?: number;
   speakers?: Speaker[];
   gallery?: string[];
@@ -131,20 +134,41 @@ const eventSchema = new Schema<IEvent>(
       required: [true, 'Organizer ID is required'],
     },
     imageUrl: {
-      type: String,
-      default: undefined,
-      validate: {
-        validator(value: string) {
-          if (!value) return true;
-          try {
-            new URL(value);
-            return true;
-          } catch {
-            return false;
-          }
+      type: {
+        portrait: {
+          type: String,
+          required: true,
+          validate: {
+            validator(value: string) {
+              if (!value) return false;
+              try {
+                new URL(value);
+                return true;
+              } catch {
+                return false;
+              }
+            },
+            message: 'Portrait image URL must be a valid URL',
+          },
         },
-        message: 'Image URL must be a valid URL',
+        landscape: {
+          type: String,
+          required: true,
+          validate: {
+            validator(value: string) {
+              if (!value) return false;
+              try {
+                new URL(value);
+                return true;
+              } catch {
+                return false;
+              }
+            },
+            message: 'Landscape image URL must be a valid URL',
+          },
+        },
       },
+      default: undefined,
     },
     basePrice: {
       type: Number,
