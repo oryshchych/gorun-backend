@@ -192,6 +192,13 @@ class PaymentsService {
     registrationId: string;
   }): Promise<PlataInvoiceResponse> {
     const { amount, customerName, eventTitle, registrationId } = params;
+
+    // Check if API key is configured
+    if (!paymentConfig.plataApiKey) {
+      logger.error('Monobank API key is not configured');
+      throw new AppError('Payment service is not configured', 500);
+    }
+
     const webhookUrl =
       paymentConfig.webhookUrl || `http://localhost:${serverConfig.port}/api/webhooks/plata-mono`;
 
@@ -212,38 +219,103 @@ class PaymentsService {
       },
     };
 
-    const response = await fetch('https://api.monobank.ua/api/merchant/invoice/create', {
-      method: 'POST',
-      headers: {
-        'X-Token': paymentConfig.plataApiKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
+    const apiUrl = 'https://api.monobank.ua/api/merchant/invoice/create';
+
+    // Log request details (without sensitive data)
+    logger.info('Creating Monobank invoice', {
+      registrationId,
+      amount: body.amount,
+      apiUrl,
+      hasApiKey: !!paymentConfig.plataApiKey,
     });
 
-    const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-    if (!response.ok) {
-      logger.error('Monobank invoice creation failed', { status: response.status, data });
-      throw new AppError('Failed to create payment link', 502);
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'X-Token': paymentConfig.plataApiKey,
+          'Content-Type': 'application/json',
+          'User-Agent': 'gorun-backend/1.0.0',
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+        // Add keepalive for better connection handling
+        keepalive: true,
+      });
+
+      clearTimeout(timeoutId);
+
+      const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+
+      if (!response.ok) {
+        logger.error('Monobank invoice creation failed', {
+          status: response.status,
+          statusText: response.statusText,
+          data,
+          registrationId,
+        });
+        throw new AppError(
+          `Failed to create payment link: ${(data as { errDescription?: string }).errDescription || 'Unknown error'}`,
+          502
+        );
+      }
+
+      const invoiceId = (data.invoiceId as string | undefined) || (data.id as string | undefined);
+      const paymentLink =
+        (data.pageUrl as string | undefined) ||
+        (data.paymentLink as string | undefined) ||
+        (data.link as string | undefined) ||
+        (data.invoiceUrl as string | undefined);
+
+      const responseData: PlataInvoiceResponse = { raw: data };
+      if (invoiceId) {
+        responseData.invoiceId = invoiceId;
+      }
+      if (paymentLink) {
+        responseData.paymentLink = paymentLink;
+      }
+
+      return responseData;
+    } catch (error) {
+      clearTimeout(timeoutId);
+
+      // Handle specific error types
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          logger.error('Monobank API request timeout', { registrationId, apiUrl });
+          throw new AppError('Payment service timeout. Please try again.', 504);
+        }
+
+        if (error.message.includes('fetch failed') || error.message.includes('ECONNREFUSED')) {
+          logger.error('Monobank API connection failed', {
+            error: error.message,
+            registrationId,
+            apiUrl,
+            stack: error.stack,
+          });
+          throw new AppError(
+            'Unable to connect to payment service. Please check your network connection or try again later.',
+            503
+          );
+        }
+
+        // If it's already an AppError, re-throw it
+        if (error instanceof AppError) {
+          throw error;
+        }
+      }
+
+      logger.error('Unexpected error creating Monobank invoice', {
+        error,
+        registrationId,
+        apiUrl,
+      });
+      throw new AppError('Failed to create payment link. Please try again.', 500);
     }
-
-    const invoiceId = (data.invoiceId as string | undefined) || (data.id as string | undefined);
-    const paymentLink =
-      (data.pageUrl as string | undefined) ||
-      (data.paymentLink as string | undefined) ||
-      (data.link as string | undefined) ||
-      (data.invoiceUrl as string | undefined);
-
-    const responseData: PlataInvoiceResponse = { raw: data };
-    if (invoiceId) {
-      responseData.invoiceId = invoiceId;
-    }
-    if (paymentLink) {
-      responseData.paymentLink = paymentLink;
-    }
-
-    return responseData;
   }
 }
 

@@ -54,6 +54,9 @@ const requestLogger = (req: Request, res: Response, next: NextFunction): void =>
 const createApp = (): Application => {
   const app = express();
 
+  // Trust proxy (required for Railway, Heroku, and other platforms behind reverse proxy)
+  app.set('trust proxy', true);
+
   // Apply CORS middleware with configured origin
   app.use(
     cors({
