@@ -3,9 +3,9 @@ import {
   cancelRegistration,
   createPublicRegistration,
   getMyRegistrations,
-  getPaymentLink,
   getRegistrations,
   processRefund,
+  syncPaymentStatus,
 } from '../controllers/registrations.controller';
 import { authenticate } from '../middleware/auth.middleware';
 import { registrationLimiter } from '../middleware/rateLimiter.middleware';
@@ -13,7 +13,6 @@ import { ValidationType, validate } from '../middleware/validation.middleware';
 import { asyncHandler } from '../utils/asyncHandler';
 import {
   createPublicRegistrationSchema,
-  getPaymentLinkSchema,
   getRegistrationsQuerySchema,
   refundSchema,
   registrationIdSchema,
@@ -45,16 +44,6 @@ router.get(
 );
 
 /**
- * GET /api/registrations/payment-link
- * Get payment link for existing registration by email (public)
- */
-router.get(
-  '/payment-link',
-  validate(getPaymentLinkSchema, ValidationType.QUERY),
-  asyncHandler(getPaymentLink)
-);
-
-/**
  * POST /api/registrations
  * Create a new registration (public)
  */
@@ -66,6 +55,16 @@ router.post(
 );
 
 /**
+ * POST /api/registrations/:id/sync-payment
+ * Sync payment status from Monobank API (public, fallback if webhook missed)
+ */
+router.post(
+  '/:id/sync-payment',
+  validate(registrationIdSchema, ValidationType.PARAMS),
+  asyncHandler(syncPaymentStatus)
+);
+
+/**
  * DELETE /api/registrations/:id
  * Cancel a registration (requires authentication)
  */
@@ -74,16 +73,6 @@ router.delete(
   authenticate,
   validate(registrationIdSchema, ValidationType.PARAMS),
   asyncHandler(cancelRegistration)
-);
-
-/**
- * GET /api/registrations/payment-link
- * Get payment link for existing registration by email (public)
- */
-router.get(
-  '/payment-link',
-  validate(getPaymentLinkSchema, ValidationType.QUERY),
-  asyncHandler(getPaymentLink)
 );
 
 /**

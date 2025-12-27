@@ -43,29 +43,86 @@ const verifySignature = (rawBody: string, signatureHeader?: string): boolean => 
 
 export const handlePlataWebhook = async (req: Request, res: Response): Promise<void> => {
   const rawBody = (req as Request & { rawBody?: string }).rawBody ?? JSON.stringify(req.body);
+  const signatureHeader = req.headers['x-sign'] as string | undefined;
 
-  if (!verifySignature(rawBody, req.headers['x-sign'] as string | undefined)) {
+  logger.info('Received Monobank webhook', {
+    hasSignature: !!signatureHeader,
+    bodyKeys: Object.keys(req.body || {}),
+    invoiceId: (req.body as { invoiceId?: string })?.invoiceId,
+    status: (req.body as { status?: string })?.status,
+  });
+
+  if (!verifySignature(rawBody, signatureHeader)) {
+    logger.error('Webhook signature verification failed', {
+      hasSignature: !!signatureHeader,
+      invoiceId: (req.body as { invoiceId?: string })?.invoiceId,
+    });
     res.status(400).json({ success: false, message: 'Invalid webhook signature' });
     return;
   }
 
-  const payload = await plataWebhookSchema.parseAsync(req.body);
+  let payload;
+  try {
+    payload = await plataWebhookSchema.parseAsync(req.body);
+  } catch (error) {
+    logger.error('Webhook payload validation failed', {
+      error,
+      body: req.body,
+    });
+    res.status(400).json({ success: false, message: 'Invalid webhook payload' });
+    return;
+  }
+
   const invoiceId = payload.invoiceId;
 
   if (!invoiceId) {
+    logger.error('Webhook missing invoiceId', { payload });
     res.status(400).json({ success: false, message: 'invoiceId is required' });
     return;
   }
 
+  logger.info('Processing webhook for invoice', {
+    invoiceId,
+    status: payload.status,
+    paymentId: payload.paymentId,
+  });
+
   const payment = await paymentsService.findByInvoiceId(invoiceId);
   if (!payment) {
+    logger.error('Payment not found for invoice', { invoiceId });
     res.status(404).json({ success: false, message: 'Payment not found' });
     return;
   }
 
+  logger.info('Found payment for webhook', {
+    paymentId: payment._id.toString(),
+    currentStatus: payment.status,
+    registrationId: payment.registrationId,
+    newStatus: payload.status,
+  });
+
   // Monobank statuses: 'created', 'processing', 'success', 'failure', 'expired', 'hold'
   // Only 'success' means payment is completed
   const isSuccess = payload.status === 'success';
+
+  // Skip processing if payment is already in the target state
+  if (isSuccess && payment.status === 'completed') {
+    logger.info('Payment already completed, skipping webhook processing', {
+      paymentId: payment._id.toString(),
+      invoiceId,
+    });
+    res.status(200).json({ success: true, message: 'Payment already processed' });
+    return;
+  }
+
+  if (!isSuccess && payment.status === 'failed') {
+    logger.info('Payment already marked as failed, skipping webhook processing', {
+      paymentId: payment._id.toString(),
+      invoiceId,
+    });
+    res.status(200).json({ success: true, message: 'Payment already processed' });
+    return;
+  }
 
   try {
     const registration = isSuccess
@@ -75,6 +132,13 @@ export const handlePlataWebhook = async (req: Request, res: Response): Promise<v
           payload as Record<string, unknown>
         )
       : await registrationsService.markPaymentFailed(payment, payload as Record<string, unknown>);
+
+    logger.info('Webhook processed successfully', {
+      paymentId: payment._id.toString(),
+      registrationId: registration.id,
+      status: payload.status,
+      isSuccess,
+    });
 
     const event = await Event.findById(registration.eventId).lean();
 
@@ -102,7 +166,13 @@ export const handlePlataWebhook = async (req: Request, res: Response): Promise<v
 
     res.status(200).json({ success: true });
   } catch (error) {
-    logger.error('Failed to process Monobank webhook', { error });
+    logger.error('Failed to process Monobank webhook', {
+      error,
+      paymentId: payment._id.toString(),
+      invoiceId,
+      status: payload.status,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     res.status(500).json({ success: false, message: 'Webhook processing failed' });
   }
 };

@@ -218,3 +218,37 @@ export const getPaymentLink = async (req: Request, res: Response): Promise<void>
     paymentLink: result.paymentLink,
   });
 };
+
+/**
+ * Sync payment status from Monobank API
+ * POST /api/registrations/:id/sync-payment
+ * Fallback mechanism to check payment status if webhook was missed
+ */
+export const syncPaymentStatus = async (req: Request, res: Response): Promise<void> => {
+  const { id } = req.params;
+
+  if (!id) {
+    res.status(400).json({
+      success: false,
+      message: 'Registration ID is required',
+    });
+    return;
+  }
+
+  try {
+    const result = await registrationsService.syncPaymentStatus(id);
+
+    res.status(200).json({
+      success: true,
+      data: result,
+      message: result.statusChanged
+        ? 'Payment status synchronized successfully'
+        : 'Payment status is already up to date',
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : 'Failed to sync payment status',
+    });
+  }
+};

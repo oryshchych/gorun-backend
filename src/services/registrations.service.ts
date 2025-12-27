@@ -714,6 +714,101 @@ class RegistrationsService {
   }
 
   /**
+   * Sync payment status from Monobank API
+   * Fallback mechanism if webhook was missed
+   */
+  async syncPaymentStatus(registrationId: string): Promise<{
+    registration: RegistrationResponse;
+    statusChanged: boolean;
+    previousStatus: string;
+    newStatus: string;
+  }> {
+    const registration = await Registration.findById(registrationId);
+    if (!registration) {
+      throw new NotFoundError('Registration not found');
+    }
+
+    if (!registration.paymentId) {
+      throw new AppError('Registration has no payment', 400);
+    }
+
+    const payment = await Payment.findById(registration.paymentId);
+    if (!payment) {
+      throw new NotFoundError('Payment not found');
+    }
+
+    if (!payment.plataMonoInvoiceId) {
+      throw new AppError('Payment has no invoice ID', 400);
+    }
+
+    // If already completed, no need to sync
+    if (payment.status === 'completed' && registration.status === 'confirmed') {
+      return {
+        registration: this.formatRegistrationResponse(registration.toObject()),
+        statusChanged: false,
+        previousStatus: payment.status,
+        newStatus: payment.status,
+      };
+    }
+
+    // Check status from Monobank API
+    const statusData = await paymentsService.checkPaymentStatus(payment._id.toString());
+    if (!statusData) {
+      throw new AppError('Failed to get payment status from Monobank', 502);
+    }
+
+    const monobankStatus = statusData.status as string | undefined;
+    const isSuccess = monobankStatus === 'success';
+
+    const previousPaymentStatus = payment.status;
+
+    // Only update if status is 'success' and payment is not already completed
+    if (isSuccess && payment.status !== 'completed') {
+      await this.markPaymentCompleted(
+        payment,
+        statusData.paymentId as string | undefined,
+        statusData as Record<string, unknown>
+      );
+
+      // Reload registration to get updated status
+      await registration.populate('eventId');
+      const updatedRegistration = await Registration.findById(registrationId);
+
+      return {
+        registration: this.formatRegistrationResponse(
+          updatedRegistration?.toObject() || registration.toObject()
+        ),
+        statusChanged: true,
+        previousStatus: previousPaymentStatus,
+        newStatus: 'completed',
+      };
+    }
+
+    // If status is failure and payment is not already failed
+    if (monobankStatus === 'failure' && payment.status !== 'failed') {
+      await this.markPaymentFailed(payment, statusData as Record<string, unknown>);
+
+      const updatedRegistration = await Registration.findById(registrationId);
+      return {
+        registration: this.formatRegistrationResponse(
+          updatedRegistration?.toObject() || registration.toObject()
+        ),
+        statusChanged: true,
+        previousStatus: previousPaymentStatus,
+        newStatus: 'failed',
+      };
+    }
+
+    // No change needed
+    return {
+      registration: this.formatRegistrationResponse(registration.toObject()),
+      statusChanged: false,
+      previousStatus: previousPaymentStatus,
+      newStatus: payment.status,
+    };
+  }
+
+  /**
    * Resolve event id from input or fallback to configured single event id
    */
   private resolveEventId(eventId: string): string {
