@@ -60,19 +60,19 @@ class EmailService {
     } = params;
 
     const html = `
-      <h1>Registration Confirmed</h1>
-      <p>Hi ${name},</p>
-      <p>Your registration for <strong>${eventTitle}</strong> is confirmed.</p>
-      <p><strong>Event date:</strong> ${new Date(eventDate).toLocaleString()}</p>
-      <p><strong>Location:</strong> ${eventLocation}</p>
-      <p><strong>Payment:</strong> ${paymentAmount} ${paymentCurrency}</p>
-      <p><strong>Registration ID:</strong> ${registrationId}</p>
-      <p>Thank you for registering!</p>
+      <h1>Реєстрацію підтверджено</h1>
+      <p>Вітаємо, ${name}!</p>
+      <p>Вашу реєстрацію на <strong>${eventTitle}</strong> підтверджено.</p>
+      <p><strong>Дата події:</strong> ${new Date(eventDate).toLocaleString('uk-UA')}</p>
+      <p><strong>Місце проведення:</strong> ${eventLocation}</p>
+      <p><strong>Оплата:</strong> ${paymentAmount} ${paymentCurrency}</p>
+      <p><strong>ID реєстрації:</strong> ${registrationId}</p>
+      <p>Дякуємо за реєстрацію!</p>
     `;
 
     await this.sendEmail({
       to,
-      subject: `Registration Confirmed - ${eventTitle}`,
+      subject: `Реєстрацію підтверджено - ${eventTitle}`,
       html,
     });
   }
@@ -87,17 +87,17 @@ class EmailService {
     const { to, name, eventTitle, retryLink, errorMessage } = params;
 
     const html = `
-      <h1>Payment Failed</h1>
-      <p>Hi ${name},</p>
-      <p>We could not complete your payment for <strong>${eventTitle}</strong>.</p>
-      <p>${errorMessage ?? 'Payment was declined or cancelled.'}</p>
-      <p>You can retry your payment here: <a href="${retryLink}">Retry payment</a></p>
-      <p>If the issue persists, please contact support.</p>
+      <h1>Оплата не вдалася</h1>
+      <p>Вітаємо, ${name}!</p>
+      <p>Нам не вдалося завершити вашу оплату за <strong>${eventTitle}</strong>.</p>
+      <p>${errorMessage ?? 'Оплату було відхилено або скасовано.'}</p>
+      <p>Ви можете спробувати оплатити знову за цим посиланням: <a href="${retryLink}">Спробувати оплату знову</a></p>
+      <p>Якщо проблема не зникає, будь ласка, зв'яжіться зі службою підтримки.</p>
     `;
 
     await this.sendEmail({
       to,
-      subject: `Payment Failed - ${eventTitle}`,
+      subject: `Оплата не вдалася - ${eventTitle}`,
       html,
     });
   }
@@ -111,15 +111,65 @@ class EmailService {
     const { to, name, eventTitle, supportEmail } = params;
 
     const html = `
-      <h1>Registration Issue</h1>
-      <p>Hi ${name},</p>
-      <p>We encountered an issue while processing your registration for <strong>${eventTitle}</strong>.</p>
-      <p>Our team is looking into it. If you need help, please contact ${supportEmail}.</p>
+      <h1>Проблема з реєстрацією</h1>
+      <p>Вітаємо, ${name}!</p>
+      <p>Ми зіткнулися з проблемою під час обробки вашої реєстрації на <strong>${eventTitle}</strong>.</p>
+      <p>Наша команда вже працює над цим. Якщо вам потрібна допомога, будь ласка, зв'яжіться з ${supportEmail}.</p>
     `;
 
     await this.sendEmail({
       to,
-      subject: `Registration Issue - ${eventTitle}`,
+      subject: `Проблема з реєстрацією - ${eventTitle}`,
+      html,
+    });
+  }
+
+  async sendPaymentLink(params: {
+    to: string;
+    name: string;
+    eventTitle: string;
+    eventDate: string;
+    eventLocation: string;
+    paymentAmount: number;
+    paymentCurrency: string;
+    paymentLink: string;
+    registrationId: string;
+  }): Promise<void> {
+    const {
+      to,
+      name,
+      eventTitle,
+      eventDate,
+      eventLocation,
+      paymentAmount,
+      paymentCurrency,
+      paymentLink,
+      registrationId,
+    } = params;
+
+    const html = `
+      <h1>Завершіть вашу реєстрацію</h1>
+      <p>Вітаємо, ${name}!</p>
+      <p>Дякуємо за реєстрацію на <strong>${eventTitle}</strong>!</p>
+      <p><strong>Дата події:</strong> ${new Date(eventDate).toLocaleString('uk-UA')}</p>
+      <p><strong>Місце проведення:</strong> ${eventLocation}</p>
+      <p><strong>Сума до оплати:</strong> ${paymentAmount} ${paymentCurrency}</p>
+      <p><strong>ID реєстрації:</strong> ${registrationId}</p>
+      <p>Будь ласка, завершіть оплату, натиснувши на посилання нижче:</p>
+      <p style="margin: 30px 0;">
+        <a href="${paymentLink}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">
+          Завершити оплату
+        </a>
+      </p>
+      <p>Або скопіюйте та вставте це посилання у ваш браузер:</p>
+      <p style="word-break: break-all; color: #666;">${paymentLink}</p>
+      <p><strong>Важливо:</strong> Це посилання на оплату дійсне обмежений час. Будь ласка, завершіть оплату якнайшвидше.</p>
+      <p>Якщо у вас виникли питання, будь ласка, зв'яжіться з нашою службою підтримки.</p>
+    `;
+
+    await this.sendEmail({
+      to,
+      subject: `Завершіть вашу реєстрацію - ${eventTitle}`,
       html,
     });
   }

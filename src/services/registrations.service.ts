@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { eventConfig } from '../config/env';
+import { eventConfig, paymentConfig } from '../config/env';
 import { Event } from '../models/Event';
 import { IPayment, Payment } from '../models/Payment';
 import { Registration } from '../models/Registration';
@@ -10,6 +10,7 @@ import {
   getPaginationParams,
 } from '../utils/pagination.util';
 import { calculatePrice } from '../utils/pricing.util';
+import emailService from './email.service';
 import paymentsService from './payments.service';
 import promoCodesService from './promoCodes.service';
 
@@ -222,6 +223,24 @@ class RegistrationsService {
           };
           if (payment?.paymentLink) {
             responsePayload.paymentLink = payment.paymentLink;
+
+            // Resend payment link email (async, non-blocking)
+            if (existing.email) {
+              const event = await Event.findById(resolvedEventId).lean();
+              if (event) {
+                void emailService.sendPaymentLink({
+                  to: existing.email,
+                  name: `${existing.name ?? ''} ${existing.surname ?? ''}`.trim() || 'Participant',
+                  eventTitle: event.title,
+                  eventDate: event.date.toISOString(),
+                  eventLocation: event.location,
+                  paymentAmount: existing.finalPrice ?? 0,
+                  paymentCurrency: paymentConfig.currency,
+                  paymentLink: payment.paymentLink,
+                  registrationId: existing._id.toString(),
+                });
+              }
+            }
           }
 
           return responsePayload;
@@ -280,6 +299,21 @@ class RegistrationsService {
       await registration.save(session ? { session } : undefined);
 
       await session.commitTransaction();
+
+      // Send payment link email (async, non-blocking)
+      if (paymentLink && registration.email && event) {
+        void emailService.sendPaymentLink({
+          to: registration.email,
+          name: `${name} ${surname}`.trim() || 'Participant',
+          eventTitle: event.title,
+          eventDate: event.date.toISOString(),
+          eventLocation: event.location,
+          paymentAmount: finalPrice,
+          paymentCurrency: paymentConfig.currency,
+          paymentLink,
+          registrationId: registration._id.toString(),
+        });
+      }
 
       const responsePayload: { registration: RegistrationResponse; paymentLink?: string } = {
         registration: this.formatRegistrationResponse(registration.toObject()),
