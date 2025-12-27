@@ -1671,6 +1671,72 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+      '/api/registrations/payment-link': {
+        get: {
+          tags: ['Registrations'],
+          summary: 'Get payment link for existing registration',
+          description:
+            'Retrieve payment link for a pending registration by email. Use this when user closes payment page and needs to resume payment.',
+          parameters: [
+            {
+              name: 'email',
+              in: 'query',
+              required: true,
+              description: 'Email address used for registration',
+              schema: {
+                type: 'string',
+                format: 'email',
+              },
+            },
+            {
+              name: 'eventId',
+              in: 'query',
+              required: true,
+              description: 'Event ID',
+              schema: {
+                type: 'string',
+              },
+            },
+          ],
+          responses: {
+            200: {
+              description: 'Payment link retrieved successfully',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean' },
+                      data: { $ref: '#/components/schemas/Registration' },
+                      paymentLink: {
+                        type: 'string',
+                        format: 'uri',
+                        description: 'URL to complete payment',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            400: {
+              description: 'Invalid email or eventId',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/Error' },
+                },
+              },
+            },
+            404: {
+              description: 'No pending registration found for this email and event',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/Error' },
+                },
+              },
+            },
+          },
+        },
+      },
       '/api/registrations/my': {
         get: {
           tags: ['Registrations'],

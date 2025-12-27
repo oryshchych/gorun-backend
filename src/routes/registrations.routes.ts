@@ -3,6 +3,7 @@ import {
   cancelRegistration,
   createPublicRegistration,
   getMyRegistrations,
+  getPaymentLink,
   getRegistrations,
   processRefund,
 } from '../controllers/registrations.controller';
@@ -12,6 +13,7 @@ import { ValidationType, validate } from '../middleware/validation.middleware';
 import { asyncHandler } from '../utils/asyncHandler';
 import {
   createPublicRegistrationSchema,
+  getPaymentLinkSchema,
   getRegistrationsQuerySchema,
   refundSchema,
   registrationIdSchema,
@@ -43,6 +45,16 @@ router.get(
 );
 
 /**
+ * GET /api/registrations/payment-link
+ * Get payment link for existing registration by email (public)
+ */
+router.get(
+  '/payment-link',
+  validate(getPaymentLinkSchema, ValidationType.QUERY),
+  asyncHandler(getPaymentLink)
+);
+
+/**
  * POST /api/registrations
  * Create a new registration (public)
  */
@@ -62,6 +74,16 @@ router.delete(
   authenticate,
   validate(registrationIdSchema, ValidationType.PARAMS),
   asyncHandler(cancelRegistration)
+);
+
+/**
+ * GET /api/registrations/payment-link
+ * Get payment link for existing registration by email (public)
+ */
+router.get(
+  '/payment-link',
+  validate(getPaymentLinkSchema, ValidationType.QUERY),
+  asyncHandler(getPaymentLink)
 );
 
 /**

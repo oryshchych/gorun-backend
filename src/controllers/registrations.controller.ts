@@ -182,3 +182,39 @@ export const processRefund = async (req: AuthRequest, res: Response): Promise<vo
     message: 'Refund processed successfully',
   });
 };
+
+/**
+ * Get payment link for existing registration by email
+ * GET /api/registrations/payment-link?email=...&eventId=...
+ * Used when user closes payment page and needs to resume payment
+ */
+export const getPaymentLink = async (req: Request, res: Response): Promise<void> => {
+  const { email, eventId } = req.query;
+
+  if (!email || !eventId) {
+    res.status(400).json({
+      success: false,
+      message: 'Email and eventId are required',
+    });
+    return;
+  }
+
+  const result = await registrationsService.getPaymentLinkByEmail(
+    email as string,
+    eventId as string
+  );
+
+  if (!result) {
+    res.status(404).json({
+      success: false,
+      message: 'No pending registration found for this email and event',
+    });
+    return;
+  }
+
+  res.status(200).json({
+    success: true,
+    data: result.registration,
+    paymentLink: result.paymentLink,
+  });
+};

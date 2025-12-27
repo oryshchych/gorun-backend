@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { eventConfig } from '../config/env';
 import { Event } from '../models/Event';
-import { IPayment } from '../models/Payment';
+import { IPayment, Payment } from '../models/Payment';
 import { Registration } from '../models/Registration';
 import { AppError, ConflictError, ForbiddenError, NotFoundError } from '../types/errors';
 import {
@@ -199,14 +199,36 @@ class RegistrationsService {
         throw new ConflictError('Event is full');
       }
 
-      // Prevent duplicate registration by email for this event
+      // Check if registration already exists for this email and event
       const existing = await Registration.findOne({
         eventId: resolvedEventId,
         email: email.toLowerCase(),
       }).session(session);
 
       if (existing) {
-        throw new ConflictError('This email is already registered for the event');
+        // If registration exists and payment is completed/confirmed, throw error
+        if (existing.status === 'confirmed' || existing.paymentStatus === 'completed') {
+          throw new ConflictError('This email is already registered for the event');
+        }
+
+        // If registration exists with pending payment, return existing payment link
+        if (existing.paymentStatus === 'pending' && existing.paymentId) {
+          await session.abortTransaction();
+          session.endSession();
+
+          const payment = await Payment.findById(existing.paymentId);
+          const responsePayload: { registration: RegistrationResponse; paymentLink?: string } = {
+            registration: this.formatRegistrationResponse(existing.toObject()),
+          };
+          if (payment?.paymentLink) {
+            responsePayload.paymentLink = payment.paymentLink;
+          }
+
+          return responsePayload;
+        }
+
+        // If registration exists but payment failed, allow retry by creating new payment
+        // (fall through to create new payment)
       }
 
       const validatedPromo = promoCode
@@ -623,6 +645,38 @@ class RegistrationsService {
     } finally {
       session.endSession();
     }
+  }
+
+  /**
+   * Get payment link for existing registration by email
+   * Used when user closes payment page and needs to resume payment
+   */
+  async getPaymentLinkByEmail(
+    email: string,
+    eventId: string
+  ): Promise<{ registration: RegistrationResponse; paymentLink?: string } | null> {
+    const resolvedEventId = this.resolveEventId(eventId);
+
+    const registration = await Registration.findOne({
+      eventId: resolvedEventId,
+      email: email.toLowerCase(),
+      paymentStatus: 'pending',
+      status: 'pending',
+    });
+
+    if (!registration || !registration.paymentId) {
+      return null;
+    }
+
+    const payment = await Payment.findById(registration.paymentId);
+    if (!payment || !payment.paymentLink) {
+      return null;
+    }
+
+    return {
+      registration: this.formatRegistrationResponse(registration.toObject()),
+      paymentLink: payment.paymentLink,
+    };
   }
 
   /**
