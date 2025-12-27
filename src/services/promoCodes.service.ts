@@ -49,6 +49,28 @@ class PromoCodesService {
       throw new NotFoundError('Promo code not found');
     }
   }
+
+  /**
+   * Decrement usedCount when a payment is refunded
+   */
+  async decrementUsage(promoCodeId: string, session?: mongoose.ClientSession): Promise<void> {
+    const result = await PromoCode.updateOne(
+      { _id: promoCodeId },
+      { $inc: { usedCount: -1 } },
+      session ? { session } : undefined
+    );
+
+    if (result.matchedCount === 0) {
+      throw new NotFoundError('Promo code not found');
+    }
+
+    // Ensure usedCount doesn't go below 0
+    await PromoCode.updateOne(
+      { _id: promoCodeId, usedCount: { $lt: 0 } },
+      { $set: { usedCount: 0 } },
+      session ? { session } : undefined
+    );
+  }
 }
 
 export default new PromoCodesService();

@@ -3,7 +3,7 @@ import { eventConfig } from '../config/env';
 import { Event } from '../models/Event';
 import { IPayment } from '../models/Payment';
 import { Registration } from '../models/Registration';
-import { ConflictError, ForbiddenError, NotFoundError } from '../types/errors';
+import { AppError, ConflictError, ForbiddenError, NotFoundError } from '../types/errors';
 import {
   PaginatedResponse,
   formatPaginatedResponse,
@@ -560,6 +560,59 @@ class RegistrationsService {
       }
 
       await paymentsService.updateStatus(payment._id.toString(), 'failed', updates, session);
+
+      await session.commitTransaction();
+
+      return this.formatRegistrationResponse(registration.toObject());
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  /**
+   * Process refund for a registration
+   * Refunds payment and updates registration status
+   */
+  async processRefund(
+    registrationId: string,
+    amount?: number,
+    extRef?: string
+  ): Promise<RegistrationResponse> {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const registration = await Registration.findById(registrationId).session(session);
+      if (!registration) {
+        throw new NotFoundError('Registration not found');
+      }
+
+      if (!registration.paymentId) {
+        throw new AppError('Registration has no payment', 400);
+      }
+
+      // Refund payment
+      await paymentsService.refundPayment(registration.paymentId, amount, extRef, session);
+
+      // Update registration status
+      registration.status = 'cancelled';
+      registration.paymentStatus = 'failed'; // Mark as failed after refund
+      await registration.save({ session });
+
+      // Decrement event registeredCount
+      await Event.updateOne(
+        { _id: registration.eventId },
+        { $inc: { registeredCount: -1 } },
+        { session }
+      );
+
+      // Decrement promo code usage if used
+      if (registration.promoCodeId) {
+        await promoCodesService.decrementUsage(registration.promoCodeId.toString(), session);
+      }
 
       await session.commitTransaction();
 

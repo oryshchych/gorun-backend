@@ -157,3 +157,28 @@ export const getPublicParticipants = async (req: Request, res: Response): Promis
     data: participants,
   });
 };
+
+/**
+ * Process refund for a registration
+ * POST /api/registrations/:id/refund
+ */
+export const processRefund = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { id } = req.params;
+  const { amount, extRef } = req.body;
+
+  if (!id) {
+    res.status(400).json({
+      success: false,
+      message: 'Registration ID is required',
+    });
+    return;
+  }
+
+  const registration = await registrationsService.processRefund(id, amount, extRef);
+
+  res.status(200).json({
+    success: true,
+    data: registration,
+    message: 'Refund processed successfully',
+  });
+};

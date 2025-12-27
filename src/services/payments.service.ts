@@ -3,6 +3,7 @@ import { frontendConfig, paymentConfig, serverConfig } from '../config/env';
 import { logger } from '../config/logger';
 import { IPayment, Payment } from '../models/Payment';
 import { AppError } from '../types/errors';
+import monobankService from './monobank.service';
 
 interface CreatePaymentParams {
   registrationId: string;
@@ -20,7 +21,7 @@ interface PlataInvoiceResponse {
 
 class PaymentsService {
   /**
-   * Create a payment record and generate a Plata by Mono invoice
+   * Create a payment record and generate a Monobank invoice
    */
   async createPaymentWithInvoice({
     registrationId,
@@ -30,7 +31,7 @@ class PaymentsService {
     session,
   }: CreatePaymentParams): Promise<{ payment: IPayment; paymentLink?: string }> {
     if (!paymentConfig.plataApiKey) {
-      throw new AppError('Plata by Mono API key is not configured', 500);
+      throw new AppError('Monobank API key is not configured', 500);
     }
 
     // Create payment record first (pending)
@@ -75,7 +76,7 @@ class PaymentsService {
   }
 
   /**
-   * Find payment by Plata invoice id
+   * Find payment by Monobank invoice id
    */
   async findByInvoiceId(invoiceId: string): Promise<IPayment | null> {
     return Payment.findOne({ plataMonoInvoiceId: invoiceId });
@@ -95,7 +96,94 @@ class PaymentsService {
   }
 
   /**
-   * Call Plata by Mono to create an invoice
+   * Check payment status from Monobank API (fallback if webhook missed)
+   * Documentation: https://monobank.ua/api-docs/acquiring/methods/ia/get--api--merchant--invoice--status
+   */
+  async checkPaymentStatus(paymentId: string): Promise<Record<string, unknown> | null> {
+    const payment = await Payment.findById(paymentId);
+    if (!payment) {
+      throw new AppError('Payment not found', 404);
+    }
+
+    if (!payment.plataMonoInvoiceId) {
+      throw new AppError('Payment has no invoice ID', 400);
+    }
+
+    const status = await monobankService.getInvoiceStatus(payment.plataMonoInvoiceId);
+    return status;
+  }
+
+  /**
+   * Refund a payment (cancel invoice)
+   * Documentation: https://monobank.ua/api-docs/acquiring/methods/ia/post--api--merchant--invoice--cancel
+   */
+  async refundPayment(
+    paymentId: string,
+    amount?: number,
+    extRef?: string,
+    session?: mongoose.ClientSession
+  ): Promise<IPayment> {
+    const payment = await Payment.findById(paymentId).session(session || null);
+    if (!payment) {
+      throw new AppError('Payment not found', 404);
+    }
+
+    if (payment.status !== 'completed') {
+      throw new AppError('Only completed payments can be refunded', 400);
+    }
+
+    if (!payment.plataMonoInvoiceId) {
+      throw new AppError('Payment has no invoice ID', 400);
+    }
+
+    // Use provided amount or full payment amount
+    const refundAmount = amount ?? payment.amount;
+
+    const cancelResult = await monobankService.cancelInvoice(
+      payment.plataMonoInvoiceId,
+      refundAmount,
+      extRef
+    );
+
+    if (!cancelResult) {
+      throw new AppError('Failed to cancel invoice with Monobank', 502);
+    }
+
+    // Update payment status to refunded
+    payment.status = 'refunded';
+    if (cancelResult) {
+      payment.webhookData = { ...payment.webhookData, refundData: cancelResult };
+    }
+    await payment.save(session ? { session } : undefined);
+
+    return payment;
+  }
+
+  /**
+   * Get receipt for a payment
+   * Documentation: https://monobank.ua/api-docs/acquiring/methods/ia/get--api--merchant--invoice--receipt
+   */
+  async getReceipt(paymentId: string): Promise<Record<string, unknown> | null> {
+    const payment = await Payment.findById(paymentId);
+    if (!payment) {
+      throw new AppError('Payment not found', 404);
+    }
+
+    if (!payment.plataMonoInvoiceId) {
+      throw new AppError('Payment has no invoice ID', 400);
+    }
+
+    if (payment.status !== 'completed') {
+      throw new AppError('Receipt is only available for completed payments', 400);
+    }
+
+    const receipt = await monobankService.getInvoiceReceipt(payment.plataMonoInvoiceId);
+    return receipt;
+  }
+
+  /**
+   * Call Monobank API to create an invoice
+   * Documentation: https://monobank.ua/api-docs/acquiring/methods/ia/post--api--merchant--invoice--create
    */
   private async createPlataInvoice(params: {
     amount: number;
@@ -107,22 +195,27 @@ class PaymentsService {
     const webhookUrl =
       paymentConfig.webhookUrl || `http://localhost:${serverConfig.port}/api/webhooks/plata-mono`;
 
+    // Monobank API expects amount in kopiykas (minimum units)
+    // ccy: 980 is ISO 4217 code for UAH (Ukrainian Hryvnia)
     const body = {
       amount: Math.round(amount * 100), // kopiykas
-      currency: paymentConfig.currency,
-      description: `Event Registration - ${customerName || 'Participant'} (${eventTitle})`,
+      ccy: 980, // UAH (ISO 4217)
+      merchantPaymInfo: {}, // Required for PPRO integration, can be empty
       redirectUrl: `${frontendConfig.successUrl}?registrationId=${registrationId}`,
-      webhookUrl,
+      successUrl: `${frontendConfig.successUrl}?registrationId=${registrationId}`,
+      failUrl: `${frontendConfig.failureUrl}?registrationId=${registrationId}`,
+      webHookUrl: webhookUrl,
       merchantData: {
         registrationId,
+        customerName,
+        eventTitle,
       },
-      failureRedirectUrl: `${frontendConfig.failureUrl}?registrationId=${registrationId}`,
     };
 
-    const response = await fetch('https://api.plata.mono.com/invoices', {
+    const response = await fetch('https://api.monobank.ua/api/merchant/invoice/create', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${paymentConfig.plataApiKey}`,
+        'X-Token': paymentConfig.plataApiKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
@@ -131,7 +224,7 @@ class PaymentsService {
     const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
 
     if (!response.ok) {
-      logger.error('Plata invoice creation failed', { status: response.status, data });
+      logger.error('Monobank invoice creation failed', { status: response.status, data });
       throw new AppError('Failed to create payment link', 502);
     }
 

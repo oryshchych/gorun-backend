@@ -8,22 +8,43 @@ import paymentsService from '../services/payments.service';
 import registrationsService from '../services/registrations.service';
 import { plataWebhookSchema } from '../validators/webhooks.validator';
 
+/**
+ * Verify webhook signature using ECDSA
+ * Documentation: https://monobank.ua/api-docs/acquiring/dev/webhooks/verify
+ */
 const verifySignature = (rawBody: string, signatureHeader?: string): boolean => {
-  if (!paymentConfig.plataWebhookSecret) return true;
+  // If no public key configured, skip verification (for development)
+  if (!paymentConfig.plataWebhookPublicKey) return true;
   if (!signatureHeader) return false;
 
-  const expected = crypto
-    .createHmac('sha256', paymentConfig.plataWebhookSecret)
-    .update(rawBody)
-    .digest('hex');
+  try {
+    // Decode base64 signature
+    const signature = Buffer.from(signatureHeader, 'base64');
 
-  return expected === signatureHeader;
+    // Public key is base64-encoded PEM format
+    // Decode from base64 to get PEM string, then convert to Buffer
+    const publicKeyPem = Buffer.from(paymentConfig.plataWebhookPublicKey, 'base64').toString(
+      'utf-8'
+    );
+    const publicKeyBuffer = Buffer.from(publicKeyPem, 'utf-8');
+
+    // Create verify object
+    const verify = crypto.createVerify('SHA256');
+    verify.write(rawBody);
+    verify.end();
+
+    // Verify signature using ECDSA public key
+    return verify.verify(publicKeyBuffer, signature);
+  } catch (error) {
+    logger.error('Webhook signature verification failed', { error });
+    return false;
+  }
 };
 
 export const handlePlataWebhook = async (req: Request, res: Response): Promise<void> => {
   const rawBody = (req as Request & { rawBody?: string }).rawBody ?? JSON.stringify(req.body);
 
-  if (!verifySignature(rawBody, req.headers['x-signature'] as string | undefined)) {
+  if (!verifySignature(rawBody, req.headers['x-sign'] as string | undefined)) {
     res.status(400).json({ success: false, message: 'Invalid webhook signature' });
     return;
   }
@@ -42,6 +63,8 @@ export const handlePlataWebhook = async (req: Request, res: Response): Promise<v
     return;
   }
 
+  // Monobank statuses: 'created', 'processing', 'success', 'failure', 'expired', 'hold'
+  // Only 'success' means payment is completed
   const isSuccess = payload.status === 'success';
 
   try {
@@ -79,7 +102,7 @@ export const handlePlataWebhook = async (req: Request, res: Response): Promise<v
 
     res.status(200).json({ success: true });
   } catch (error) {
-    logger.error('Failed to process Plata webhook', { error });
+    logger.error('Failed to process Monobank webhook', { error });
     res.status(500).json({ success: false, message: 'Webhook processing failed' });
   }
 };

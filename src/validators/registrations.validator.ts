@@ -72,3 +72,8 @@ export const eventIdParamSchema = z.object({
 export const publicEventIdParamSchema = z.object({
   eventId: flexibleIdSchema,
 });
+
+export const refundSchema = z.object({
+  amount: z.number().positive().optional(),
+  extRef: z.string().optional(),
+});

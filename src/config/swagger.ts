@@ -1728,6 +1728,103 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+      '/api/registrations/{id}/refund': {
+        post: {
+          tags: ['Registrations'],
+          summary: 'Process refund for registration',
+          description:
+            'Refund payment for a registration. This will cancel the payment with Monobank, update registration status to cancelled, and decrement event capacity.',
+          security: [
+            {
+              bearerAuth: [],
+            },
+          ],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              description: 'Registration ID',
+              schema: {
+                type: 'string',
+              },
+            },
+          ],
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    amount: {
+                      type: 'number',
+                      description:
+                        'Partial refund amount (if not provided, full amount is refunded)',
+                      minimum: 0,
+                      example: 500.0,
+                    },
+                    extRef: {
+                      type: 'string',
+                      description: 'External reference for the refund',
+                      example: 'REF-12345',
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: 'Refund processed successfully',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean' },
+                      data: { $ref: '#/components/schemas/Registration' },
+                      message: { type: 'string', example: 'Refund processed successfully' },
+                    },
+                  },
+                },
+              },
+            },
+            400: {
+              description: 'Invalid registration ID or registration has no payment',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/Error' },
+                },
+              },
+            },
+            401: {
+              description: 'Unauthorized',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/Error' },
+                },
+              },
+            },
+            404: {
+              description: 'Registration not found',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/Error' },
+                },
+              },
+            },
+            502: {
+              description: 'Failed to process refund with Monobank',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/Error' },
+                },
+              },
+            },
+          },
+        },
+      },
       '/api/registrations/{id}': {
         delete: {
           tags: ['Registrations'],
@@ -1828,8 +1925,8 @@ const options: swaggerJsdoc.Options = {
       '/api/webhooks/plata-mono': {
         post: {
           tags: ['Payments'],
-          summary: 'Plata by Mono webhook',
-          description: 'Webhook endpoint for Plata by Mono payment status updates',
+          summary: 'Monobank webhook',
+          description: 'Webhook endpoint for Monobank payment status updates',
           responses: {
             200: {
               description: 'Webhook processed',
@@ -1844,6 +1941,158 @@ const options: swaggerJsdoc.Options = {
             },
             400: {
               description: 'Invalid payload or signature',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/Error' },
+                },
+              },
+            },
+          },
+        },
+      },
+      '/api/payments/{id}/status': {
+        get: {
+          tags: ['Payments'],
+          summary: 'Check payment status',
+          description:
+            'Check payment status from Monobank API (fallback if webhook was missed). Should not be used as primary mechanism.',
+          security: [
+            {
+              bearerAuth: [],
+            },
+          ],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              description: 'Payment ID',
+              schema: {
+                type: 'string',
+              },
+            },
+          ],
+          responses: {
+            200: {
+              description: 'Payment status retrieved successfully',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean' },
+                      data: {
+                        type: 'object',
+                        description: 'Payment status from Monobank API',
+                        properties: {
+                          invoiceId: { type: 'string' },
+                          status: {
+                            type: 'string',
+                            enum: [
+                              'created',
+                              'processing',
+                              'success',
+                              'failure',
+                              'expired',
+                              'hold',
+                            ],
+                          },
+                          amount: { type: 'number' },
+                          ccy: { type: 'number' },
+                          finalAmount: { type: 'number' },
+                          createdDate: { type: 'string', format: 'date-time' },
+                          modifiedDate: { type: 'string', format: 'date-time' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            400: {
+              description: 'Invalid payment ID',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/Error' },
+                },
+              },
+            },
+            401: {
+              description: 'Unauthorized',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/Error' },
+                },
+              },
+            },
+            404: {
+              description: 'Payment not found or status unavailable',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/Error' },
+                },
+              },
+            },
+          },
+        },
+      },
+      '/api/payments/{id}/receipt': {
+        get: {
+          tags: ['Payments'],
+          summary: 'Get payment receipt',
+          description: 'Get receipt for a completed payment from Monobank',
+          security: [
+            {
+              bearerAuth: [],
+            },
+          ],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              description: 'Payment ID',
+              schema: {
+                type: 'string',
+              },
+            },
+          ],
+          responses: {
+            200: {
+              description: 'Receipt retrieved successfully',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean' },
+                      data: {
+                        type: 'object',
+                        description: 'Receipt data from Monobank API',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            400: {
+              description: 'Invalid payment ID or payment not completed',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/Error' },
+                },
+              },
+            },
+            401: {
+              description: 'Unauthorized',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/Error' },
+                },
+              },
+            },
+            404: {
+              description: 'Payment not found or receipt unavailable',
               content: {
                 'application/json': {
                   schema: { $ref: '#/components/schemas/Error' },
