@@ -284,9 +284,6 @@ class RegistrationsService {
 
         // If registration exists with pending or failed payment, return payment link
         if (existing.paymentStatus === 'pending' || existing.paymentStatus === 'failed') {
-          await session.abortTransaction();
-          session.endSession();
-
           // Validate promo code and calculate price (same as new registration)
           const validatedPromo = promoCode
             ? await promoCodesService.validate(promoCode, resolvedEventId)
@@ -294,13 +291,105 @@ class RegistrationsService {
 
           const basePrice = event.basePrice ?? eventConfig.basePrice;
           if (basePrice === undefined) {
+            await session.abortTransaction();
+            session.endSession();
             throw new ConflictError(
               'Event price is not configured',
               REGISTRATIONS_CODES.ERROR_REGISTRATION_PRICE_NOT_CONFIGURED
             );
           }
 
-          const { finalPrice } = calculatePrice(basePrice, validatedPromo);
+          const { finalPrice, discountAmount } = calculatePrice(basePrice, validatedPromo);
+
+          // Special case: If new registration is free (100% discount), cancel previous payment and confirm registration
+          if (finalPrice === 0) {
+            // Cancel previous payment if it exists and is pending
+            if (existing.paymentId) {
+              const previousPayment = await Payment.findById(existing.paymentId);
+              if (
+                previousPayment &&
+                previousPayment.status === 'pending' &&
+                previousPayment.plataMonoInvoiceId
+              ) {
+                // Try to cancel the invoice in Monobank (non-blocking, log errors but don't fail)
+                try {
+                  await monobankService.cancelInvoice(previousPayment.plataMonoInvoiceId);
+                  // Update payment status to failed (since it was cancelled)
+                  previousPayment.status = 'failed';
+                  await previousPayment.save();
+                } catch (error) {
+                  // Log error but continue - we'll still confirm the registration
+                  // The payment will remain pending in Monobank, but registration will be confirmed
+                }
+              }
+            }
+
+            // Update existing registration to confirmed with free promo code
+            existing.name = name;
+            existing.surname = surname;
+            existing.city = city;
+            if (runningClub) {
+              existing.runningClub = runningClub;
+            }
+            if (phone) {
+              existing.phone = phone;
+            }
+            if (validatedPromo?.code) {
+              existing.promoCode = validatedPromo.code;
+            } else if (promoCode) {
+              existing.promoCode = promoCode.toUpperCase();
+            }
+            if (validatedPromo?._id) {
+              existing.promoCodeId = validatedPromo._id;
+            }
+            existing.finalPrice = 0;
+            existing.status = 'confirmed';
+            existing.paymentStatus = 'completed';
+            await existing.save({ session });
+
+            // Increment event registeredCount
+            await Event.findByIdAndUpdate(event._id, { $inc: { registeredCount: 1 } }, { session });
+
+            // Increment promo code usage if used
+            if (validatedPromo?._id) {
+              await promoCodesService.incrementUsage(validatedPromo._id.toString(), session);
+            }
+
+            await session.commitTransaction();
+
+            // Send confirmation email for free registration (async, non-blocking)
+            if (existing.email && event) {
+              const emailParams: Parameters<typeof emailService.sendRegistrationConfirmation>[0] = {
+                to: existing.email,
+                name: `${name} ${surname}`.trim() || 'Participant',
+                eventTitle: event.title,
+                eventDate: event.date.toISOString(),
+                eventLocation: event.location,
+                paymentAmount: 0,
+                paymentCurrency: paymentConfig.currency,
+                registrationId: existing._id.toString(),
+                basePrice,
+              };
+
+              if (discountAmount > 0) {
+                emailParams.discountAmount = discountAmount;
+              }
+              if (validatedPromo?.code) {
+                emailParams.promoCode = validatedPromo.code;
+              }
+
+              void emailService.sendRegistrationConfirmation(emailParams);
+            }
+
+            return {
+              registration: this.formatRegistrationResponse(existing.toObject()),
+              // No paymentLink for free registrations
+            };
+          }
+
+          // If not free registration, continue with payment link logic
+          await session.abortTransaction();
+          session.endSession();
 
           // Check if existing payment link is still valid
           let paymentLink: string | undefined;
