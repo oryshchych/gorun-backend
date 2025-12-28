@@ -266,9 +266,9 @@ class PaymentsService {
       amount: amountInKopiykas, // kopiykas
       ccy: 980, // UAH (ISO 4217)
       merchantPaymInfo: {}, // Required for PPRO integration, can be empty
-      redirectUrl: `${frontendConfig.successUrl}?registrationId=${registrationId}`,
-      successUrl: `${frontendConfig.successUrl}?registrationId=${registrationId}`,
-      failUrl: `${frontendConfig.failureUrl}?registrationId=${registrationId}`,
+      redirectUrl: `${frontendConfig.url}`,
+      successUrl: `${frontendConfig.url}?tab=participants`,
+      failUrl: `${frontendConfig.url}?tab=registration`,
       webHookUrl: webhookUrl,
       merchantData: {
         registrationId,
