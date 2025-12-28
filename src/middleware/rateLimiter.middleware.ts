@@ -1,4 +1,28 @@
+import { Request } from 'express';
 import rateLimit from 'express-rate-limit';
+
+/**
+ * Custom key generator that validates IP addresses
+ * Prevents IP spoofing by validating the IP format
+ * With trust proxy set to 1, Express only trusts the first X-Forwarded-For header
+ */
+const keyGenerator = (req: Request): string => {
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+
+  // Validate IPv4 format (e.g., 192.168.1.1)
+  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
+  // Validate IPv6 format (simplified - covers most cases)
+  const ipv6Regex = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
+
+  // Check if IP matches valid format
+  if (ip === 'unknown' || ipv4Regex.test(ip) || ipv6Regex.test(ip)) {
+    return ip;
+  }
+
+  // If IP doesn't match format, use 'unknown' to prevent spoofing
+  // This ensures invalid/spoofed IPs are all grouped together
+  return 'unknown';
+};
 
 /**
  * Rate limiter for authentication endpoints
@@ -12,6 +36,7 @@ export const authLimiter = rateLimit({
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   skipSuccessfulRequests: false, // Count all requests, not just failed ones
+  keyGenerator, // Use custom key generator to prevent IP spoofing
 });
 
 /**
@@ -26,6 +51,7 @@ export const apiLimiter = rateLimit({
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   skipSuccessfulRequests: false, // Count all requests
+  keyGenerator, // Use custom key generator to prevent IP spoofing
 });
 
 /**
@@ -38,6 +64,7 @@ export const registrationLimiter = rateLimit({
   message: 'Too many registration attempts, please try again in a minute',
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator, // Use custom key generator to prevent IP spoofing
 });
 
 /**
@@ -50,4 +77,5 @@ export const promoCodeLimiter = rateLimit({
   message: 'Too many promo code requests, please try again in a minute',
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator, // Use custom key generator to prevent IP spoofing
 });

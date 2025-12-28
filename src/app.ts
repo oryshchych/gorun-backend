@@ -55,7 +55,9 @@ const createApp = (): Application => {
   const app = express();
 
   // Trust proxy (required for Railway, Heroku, and other platforms behind reverse proxy)
-  app.set('trust proxy', true);
+  // Set to 1 to trust only the first proxy (prevents IP spoofing)
+  // Most platforms (Railway, Heroku, AWS) use a single reverse proxy
+  app.set('trust proxy', 1);
 
   // Apply CORS middleware with configured origin
   app.use(
