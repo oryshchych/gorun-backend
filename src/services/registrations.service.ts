@@ -12,6 +12,7 @@ import {
 } from '../utils/pagination.util';
 import { calculatePrice } from '../utils/pricing.util';
 import emailService from './email.service';
+import monobankService from './monobank.service';
 import paymentsService from './payments.service';
 import promoCodesService from './promoCodes.service';
 
@@ -271,67 +272,125 @@ class RegistrationsService {
       }).session(session);
 
       if (existing) {
-        // If registration exists with pending payment, throw specific error first
-        if (existing.paymentStatus === 'pending') {
+        // If registration exists and payment is completed/confirmed, throw error
+        if (existing.status === 'confirmed' && existing.paymentStatus === 'completed') {
           await session.abortTransaction();
           session.endSession();
-
-          // Resend payment link email (async, non-blocking) if payment link exists
-          if (existing.paymentId) {
-            const payment = await Payment.findById(existing.paymentId);
-            if (payment?.paymentLink && existing.email) {
-              const event = await Event.findById(resolvedEventId).lean();
-              if (event) {
-                // Calculate price breakdown for email
-                const eventBasePrice = event.basePrice ?? eventConfig.basePrice;
-                const existingFinalPrice = existing.finalPrice ?? 0;
-                const discountAmount =
-                  eventBasePrice && existingFinalPrice < eventBasePrice
-                    ? eventBasePrice - existingFinalPrice
-                    : 0;
-
-                const emailParams: Parameters<typeof emailService.sendPaymentLink>[0] = {
-                  to: existing.email,
-                  name: `${existing.name ?? ''} ${existing.surname ?? ''}`.trim() || 'Participant',
-                  eventTitle: event.title,
-                  eventDate: event.date.toISOString(),
-                  eventLocation: event.location,
-                  paymentAmount: existingFinalPrice,
-                  paymentCurrency: paymentConfig.currency,
-                  paymentLink: payment.paymentLink,
-                  registrationId: existing._id.toString(),
-                  basePrice: eventBasePrice,
-                };
-
-                if (discountAmount > 0) {
-                  emailParams.discountAmount = discountAmount;
-                }
-                if (existing.promoCode) {
-                  emailParams.promoCode = existing.promoCode;
-                }
-
-                void emailService.sendPaymentLink(emailParams);
-              }
-            }
-          }
-
-          // Throw error with specific code for pending payment
-          throw new ConflictError(
-            'You have already registered for this event, but payment is still pending. Please check your email to complete the payment.',
-            REGISTRATIONS_CODES.ERROR_REGISTRATION_PENDING_PAYMENT
-          );
-        }
-
-        // If registration exists and payment is completed/confirmed, throw error
-        if (existing.status === 'confirmed' || existing.paymentStatus === 'completed') {
           throw new ConflictError(
             'This email is already registered for the event',
             REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_EMAIL
           );
         }
 
-        // If registration exists but payment failed, allow retry by creating new payment
-        // (fall through to create new payment)
+        // If registration exists with pending or failed payment, return payment link
+        if (existing.paymentStatus === 'pending' || existing.paymentStatus === 'failed') {
+          await session.abortTransaction();
+          session.endSession();
+
+          // Validate promo code and calculate price (same as new registration)
+          const validatedPromo = promoCode
+            ? await promoCodesService.validate(promoCode, resolvedEventId)
+            : null;
+
+          const basePrice = event.basePrice ?? eventConfig.basePrice;
+          if (basePrice === undefined) {
+            throw new ConflictError(
+              'Event price is not configured',
+              REGISTRATIONS_CODES.ERROR_REGISTRATION_PRICE_NOT_CONFIGURED
+            );
+          }
+
+          const { finalPrice } = calculatePrice(basePrice, validatedPromo);
+
+          // Check if existing payment link is still valid
+          let paymentLink: string | undefined;
+          if (existing.paymentId) {
+            const payment = await Payment.findById(existing.paymentId);
+            // If payment exists, has paymentLink, and is still pending in our DB
+            if (payment?.paymentLink && payment.status === 'pending') {
+              // Verify with Monobank API that invoice is still valid
+              // Valid statuses: 'created', 'processing' (can still be paid)
+              // Invalid statuses: 'success', 'failure', 'expired', 'hold'
+              if (payment.plataMonoInvoiceId) {
+                try {
+                  const invoiceStatus = await monobankService.getInvoiceStatus(
+                    payment.plataMonoInvoiceId
+                  );
+                  const monobankStatus = invoiceStatus?.status as string | undefined;
+                  // Only use existing link if invoice is still active (created or processing)
+                  if (monobankStatus === 'created' || monobankStatus === 'processing') {
+                    paymentLink = payment.paymentLink;
+                  }
+                  // If invoice is expired/failed, we'll create a new one below
+                } catch (error) {
+                  // If API call fails, assume link is invalid and create new one
+                  // (better to create new payment than return potentially invalid link)
+                }
+              } else {
+                // If no invoice ID, payment link might be invalid
+                // Create new payment to be safe
+              }
+            }
+          }
+
+          // If no valid payment link exists, create a new payment
+          if (!paymentLink) {
+            // Update existing registration with new data if needed
+            existing.name = name;
+            existing.surname = surname;
+            existing.city = city;
+            if (runningClub) {
+              existing.runningClub = runningClub;
+            }
+            if (phone) {
+              existing.phone = phone;
+            }
+            if (validatedPromo?.code) {
+              existing.promoCode = validatedPromo.code;
+            } else if (promoCode) {
+              existing.promoCode = promoCode.toUpperCase();
+            }
+            if (validatedPromo?._id) {
+              existing.promoCodeId = validatedPromo._id;
+            }
+            existing.finalPrice = finalPrice;
+            existing.paymentStatus = 'pending';
+            await existing.save();
+
+            // Create new payment
+            const newSession = await mongoose.startSession();
+            newSession.startTransaction();
+            try {
+              const { payment, paymentLink: newPaymentLink } =
+                await paymentsService.createPaymentWithInvoice({
+                  registrationId: existing._id.toString(),
+                  amount: finalPrice,
+                  customerName: `${name} ${surname}`.trim(),
+                  eventTitle: event.title,
+                  session: newSession,
+                });
+
+              existing.paymentId = payment._id.toString();
+              await existing.save({ session: newSession });
+              await newSession.commitTransaction();
+              paymentLink = newPaymentLink;
+            } catch (error) {
+              await newSession.abortTransaction();
+              throw error;
+            } finally {
+              newSession.endSession();
+            }
+          }
+
+          // Return existing registration with payment link (no email sent)
+          const response: { registration: RegistrationResponse; paymentLink?: string } = {
+            registration: this.formatRegistrationResponse(existing.toObject()),
+          };
+          if (paymentLink) {
+            response.paymentLink = paymentLink;
+          }
+          return response;
+        }
       }
 
       const validatedPromo = promoCode
@@ -503,14 +562,92 @@ class RegistrationsService {
             });
 
             if (duplicateRegistration) {
-              // If payment is pending, throw specific error
-              if (duplicateRegistration.paymentStatus === 'pending') {
+              // If payment is completed and registration is confirmed, throw duplicate error
+              if (
+                duplicateRegistration.status === 'confirmed' &&
+                duplicateRegistration.paymentStatus === 'completed'
+              ) {
                 throw new ConflictError(
-                  'You have already registered for this event, but payment is still pending. Please check your email to complete the payment.',
-                  REGISTRATIONS_CODES.ERROR_REGISTRATION_PENDING_PAYMENT
+                  'This email is already registered for the event',
+                  REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_EMAIL
                 );
               }
-              // If payment is completed, throw duplicate error
+
+              // If payment is pending or failed, return payment link (race condition case)
+              if (
+                duplicateRegistration.paymentStatus === 'pending' ||
+                duplicateRegistration.paymentStatus === 'failed'
+              ) {
+                let paymentLink: string | undefined;
+                if (duplicateRegistration.paymentId) {
+                  const payment = await Payment.findById(duplicateRegistration.paymentId);
+                  // If payment exists, has paymentLink, and is still pending in our DB
+                  if (payment?.paymentLink && payment.status === 'pending') {
+                    // Verify with Monobank API that invoice is still valid
+                    // Valid statuses: 'created', 'processing' (can still be paid)
+                    // Invalid statuses: 'success', 'failure', 'expired', 'hold'
+                    if (payment.plataMonoInvoiceId) {
+                      try {
+                        const invoiceStatus = await monobankService.getInvoiceStatus(
+                          payment.plataMonoInvoiceId
+                        );
+                        const monobankStatus = invoiceStatus?.status as string | undefined;
+                        // Only use existing link if invoice is still active (created or processing)
+                        if (monobankStatus === 'created' || monobankStatus === 'processing') {
+                          paymentLink = payment.paymentLink;
+                        }
+                        // If invoice is expired/failed, we'll create a new one below
+                      } catch (error) {
+                        // If API call fails, assume link is invalid and create new one
+                        // (better to create new payment than return potentially invalid link)
+                      }
+                    }
+                  }
+                }
+
+                // If no valid payment link exists, we need to create a new one
+                // But we don't have validatedPromo/finalPrice here, so use existing registration's finalPrice
+                if (!paymentLink && duplicateRegistration.finalPrice !== undefined) {
+                  const newSession = await mongoose.startSession();
+                  newSession.startTransaction();
+                  try {
+                    const event = await Event.findById(duplicateRegistration.eventId).lean();
+                    if (event) {
+                      const { payment, paymentLink: newPaymentLink } =
+                        await paymentsService.createPaymentWithInvoice({
+                          registrationId: duplicateRegistration._id.toString(),
+                          amount: duplicateRegistration.finalPrice,
+                          customerName:
+                            `${duplicateRegistration.name ?? ''} ${duplicateRegistration.surname ?? ''}`.trim() ||
+                            'Participant',
+                          eventTitle: event.title,
+                          session: newSession,
+                        });
+
+                      duplicateRegistration.paymentId = payment._id.toString();
+                      duplicateRegistration.paymentStatus = 'pending';
+                      await duplicateRegistration.save({ session: newSession });
+                      await newSession.commitTransaction();
+                      paymentLink = newPaymentLink;
+                    }
+                  } catch (createError) {
+                    await newSession.abortTransaction();
+                    // If payment creation fails, just return existing registration without payment link
+                  } finally {
+                    newSession.endSession();
+                  }
+                }
+
+                const response: { registration: RegistrationResponse; paymentLink?: string } = {
+                  registration: this.formatRegistrationResponse(duplicateRegistration.toObject()),
+                };
+                if (paymentLink) {
+                  response.paymentLink = paymentLink;
+                }
+                return response;
+              }
+
+              // Fallback: throw duplicate error
               throw new ConflictError(
                 'This email is already registered for the event',
                 REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_EMAIL
