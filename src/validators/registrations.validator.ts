@@ -72,3 +72,16 @@ export const eventIdParamSchema = z.object({
 export const publicEventIdParamSchema = z.object({
   eventId: flexibleIdSchema,
 });
+
+export const refundSchema = z.object({
+  amount: z.number().positive().optional(),
+  extRef: z.string().optional(),
+});
+
+export const getPaymentLinkSchema = z.object({
+  email: z
+    .string()
+    .email({ message: 'Please enter a valid email address (e.g., user@example.com)' })
+    .transform(val => val.toLowerCase()),
+  eventId: flexibleIdSchema,
+});

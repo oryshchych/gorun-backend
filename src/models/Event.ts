@@ -29,6 +29,7 @@ export interface IEvent extends Document {
     location?: { en?: string; uk?: string };
     speakers?: Array<{ en?: string; uk?: string }>;
     date?: { en?: string; uk?: string };
+    partners?: Array<{ en?: string; uk?: string; imageUrl?: string }>;
   };
   title: string;
   description: string;
@@ -79,6 +80,27 @@ const eventSchema = new Schema<IEvent>(
           en: { type: String, trim: true },
           uk: { type: String, trim: true },
         },
+        partners: [
+          {
+            en: { type: String, trim: true },
+            uk: { type: String, trim: true },
+            imageUrl: {
+              type: String,
+              validate: {
+                validator(value: string) {
+                  if (!value) return true; // Allow empty values
+                  try {
+                    new URL(value);
+                    return true;
+                  } catch {
+                    return false;
+                  }
+                },
+                message: 'Partner image URL must be a valid URL',
+              },
+            },
+          },
+        ],
       },
       default: undefined,
     },

@@ -157,3 +157,98 @@ export const getPublicParticipants = async (req: Request, res: Response): Promis
     data: participants,
   });
 };
+
+/**
+ * Process refund for a registration
+ * POST /api/registrations/:id/refund
+ */
+export const processRefund = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { id } = req.params;
+  const { amount, extRef } = req.body;
+
+  if (!id) {
+    res.status(400).json({
+      success: false,
+      message: 'Registration ID is required',
+    });
+    return;
+  }
+
+  const registration = await registrationsService.processRefund(id, amount, extRef);
+
+  res.status(200).json({
+    success: true,
+    data: registration,
+    message: 'Refund processed successfully',
+  });
+};
+
+/**
+ * Get payment link for existing registration by email
+ * GET /api/registrations/payment-link?email=...&eventId=...
+ * Used when user closes payment page and needs to resume payment
+ */
+export const getPaymentLink = async (req: Request, res: Response): Promise<void> => {
+  const { email, eventId } = req.query;
+
+  if (!email || !eventId) {
+    res.status(400).json({
+      success: false,
+      message: 'Email and eventId are required',
+    });
+    return;
+  }
+
+  const result = await registrationsService.getPaymentLinkByEmail(
+    email as string,
+    eventId as string
+  );
+
+  if (!result) {
+    res.status(404).json({
+      success: false,
+      message: 'No pending registration found for this email and event',
+    });
+    return;
+  }
+
+  res.status(200).json({
+    success: true,
+    data: result.registration,
+    paymentLink: result.paymentLink,
+  });
+};
+
+/**
+ * Sync payment status from Monobank API
+ * POST /api/registrations/:id/sync-payment
+ * Fallback mechanism to check payment status if webhook was missed
+ */
+export const syncPaymentStatus = async (req: Request, res: Response): Promise<void> => {
+  const { id } = req.params;
+
+  if (!id) {
+    res.status(400).json({
+      success: false,
+      message: 'Registration ID is required',
+    });
+    return;
+  }
+
+  try {
+    const result = await registrationsService.syncPaymentStatus(id);
+
+    res.status(200).json({
+      success: true,
+      data: result,
+      message: result.statusChanged
+        ? 'Payment status synchronized successfully'
+        : 'Payment status is already up to date',
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : 'Failed to sync payment status',
+    });
+  }
+};

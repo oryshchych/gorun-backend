@@ -1,19 +1,22 @@
 import { Router } from 'express';
 import {
-  getRegistrations,
-  getMyRegistrations,
-  createPublicRegistration,
   cancelRegistration,
+  createPublicRegistration,
+  getMyRegistrations,
+  getRegistrations,
+  processRefund,
+  syncPaymentStatus,
 } from '../controllers/registrations.controller';
 import { authenticate } from '../middleware/auth.middleware';
-import { validate, ValidationType } from '../middleware/validation.middleware';
+import { registrationLimiter } from '../middleware/rateLimiter.middleware';
+import { ValidationType, validate } from '../middleware/validation.middleware';
+import { asyncHandler } from '../utils/asyncHandler';
 import {
   createPublicRegistrationSchema,
-  registrationIdSchema,
   getRegistrationsQuerySchema,
+  refundSchema,
+  registrationIdSchema,
 } from '../validators/registrations.validator';
-import { asyncHandler } from '../utils/asyncHandler';
-import { registrationLimiter } from '../middleware/rateLimiter.middleware';
 
 const router = Router();
 
@@ -52,6 +55,16 @@ router.post(
 );
 
 /**
+ * POST /api/registrations/:id/sync-payment
+ * Sync payment status from Monobank API (public, fallback if webhook missed)
+ */
+router.post(
+  '/:id/sync-payment',
+  validate(registrationIdSchema, ValidationType.PARAMS),
+  asyncHandler(syncPaymentStatus)
+);
+
+/**
  * DELETE /api/registrations/:id
  * Cancel a registration (requires authentication)
  */
@@ -60,6 +73,18 @@ router.delete(
   authenticate,
   validate(registrationIdSchema, ValidationType.PARAMS),
   asyncHandler(cancelRegistration)
+);
+
+/**
+ * POST /api/registrations/:id/refund
+ * Process refund for a registration (requires authentication)
+ */
+router.post(
+  '/:id/refund',
+  authenticate,
+  validate(registrationIdSchema, ValidationType.PARAMS),
+  validate(refundSchema, ValidationType.BODY),
+  asyncHandler(processRefund)
 );
 
 export default router;

@@ -15,6 +15,7 @@ export type TranslationFields = {
   location?: { en?: string; uk?: string };
   speakers?: Array<{ en?: string; uk?: string }>;
   date?: { en?: string; uk?: string };
+  partners?: Array<{ en?: string; uk?: string; imageUrl?: string }>;
 };
 export interface CreateEventInput {
   translations: TranslationFields;
@@ -376,6 +377,7 @@ class EventsService {
             description?: { en?: string; uk?: string };
             location?: { en?: string; uk?: string };
             speakers?: Array<{ en?: string; uk?: string }>;
+            partners?: Array<{ en?: string; uk?: string; imageUrl?: string }>;
           }
         | undefined;
       title: string;
@@ -496,6 +498,7 @@ class EventsService {
             description?: { en?: string; uk?: string };
             location?: { en?: string; uk?: string };
             speakers?: Array<{ en?: string; uk?: string }>;
+            partners?: Array<{ en?: string; uk?: string; imageUrl?: string }>;
           }
         | undefined;
       title: string;
@@ -525,6 +528,11 @@ class EventsService {
       mergedTranslations.speakers = input.translations.speakers;
     } else if (currentTranslations.speakers !== undefined) {
       mergedTranslations.speakers = currentTranslations.speakers;
+    }
+    if (input.translations?.partners !== undefined) {
+      mergedTranslations.partners = input.translations.partners;
+    } else if (currentTranslations.partners !== undefined) {
+      mergedTranslations.partners = currentTranslations.partners;
     }
 
     const legacyTitle = input.title ?? mergedTranslations.title?.en ?? existing.title;
@@ -563,6 +571,7 @@ class EventsService {
           location?: { en?: string; uk?: string };
           speakers?: Array<{ en?: string; uk?: string }>;
           date?: { en?: string; uk?: string };
+          partners?: Array<{ en?: string; uk?: string; imageUrl?: string }>;
         }
       | undefined;
     title: string;
@@ -604,6 +613,9 @@ class EventsService {
     };
     if (speakers !== undefined) {
       translations.speakers = speakers;
+    }
+    if (t.partners !== undefined) {
+      translations.partners = t.partners;
     }
     return translations;
   }

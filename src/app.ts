@@ -11,6 +11,7 @@ import { apiLimiter, authLimiter } from './middleware/rateLimiter.middleware';
 import authRoutes from './routes/auth.routes';
 import cloudinaryRoutes from './routes/cloudinary.routes';
 import eventsRoutes from './routes/events.routes';
+import paymentsRoutes from './routes/payments.routes';
 import promoCodeRoutes from './routes/promoCodes.routes';
 import registrationsRoutes from './routes/registrations.routes';
 import webhooksRoutes from './routes/webhooks.routes';
@@ -52,6 +53,9 @@ const requestLogger = (req: Request, res: Response, next: NextFunction): void =>
  */
 const createApp = (): Application => {
   const app = express();
+
+  // Trust proxy (required for Railway, Heroku, and other platforms behind reverse proxy)
+  app.set('trust proxy', true);
 
   // Apply CORS middleware with configured origin
   app.use(
@@ -108,6 +112,9 @@ const createApp = (): Application => {
 
   // Registrations routes with general API rate limiting
   app.use('/api/registrations', apiLimiter, registrationsRoutes);
+
+  // Payments routes with general API rate limiting
+  app.use('/api/payments', apiLimiter, paymentsRoutes);
 
   // Promo code validation
   app.use('/api/promo-codes', apiLimiter, promoCodeRoutes);

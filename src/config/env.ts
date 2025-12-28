@@ -34,13 +34,13 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
   // Public registration MVP
   PLATA_MONO_API_KEY: z.string().optional(),
-  PLATA_MONO_WEBHOOK_SECRET: z.string().optional(),
+  PLATA_MONO_WEBHOOK_PUBLIC_KEY: z.string().optional(), // Base64-encoded public key from Monobank
   PLATA_MONO_WEBHOOK_URL: z.string().default('http://localhost:5000/api/webhooks/plata-mono'),
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_EMAIL: z.string().optional(),
   FRONTEND_URL: z.string().default('http://localhost:3000'),
-  FRONTEND_SUCCESS_URL: z.string().default('http://localhost:3000/registration/success'),
-  FRONTEND_FAILURE_URL: z.string().default('http://localhost:3000/registration/failed'),
+  FRONTEND_SUCCESS_URL: z.string().default('http://localhost:3000/'),
+  FRONTEND_FAILURE_URL: z.string().default('http://localhost:3000/'),
   SINGLE_EVENT_ID: z.string().optional(),
   EVENT_BASE_PRICE: z.string().default('1000').transform(Number).pipe(z.number().nonnegative()),
 });
@@ -100,7 +100,7 @@ export const logConfig = {
 
 export const paymentConfig = {
   plataApiKey: config.PLATA_MONO_API_KEY ?? '',
-  plataWebhookSecret: config.PLATA_MONO_WEBHOOK_SECRET ?? '',
+  plataWebhookPublicKey: config.PLATA_MONO_WEBHOOK_PUBLIC_KEY ?? '', // Base64-encoded ECDSA public key
   currency: 'UAH',
   webhookUrl: config.PLATA_MONO_WEBHOOK_URL,
 };
