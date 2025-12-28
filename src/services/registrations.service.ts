@@ -171,6 +171,33 @@ class RegistrationsService {
     } catch (error) {
       // Rollback transaction on error
       await session.abortTransaction();
+
+      // Handle MongoDB duplicate key errors for registrations
+      if (
+        error &&
+        typeof error === 'object' &&
+        'name' in error &&
+        (error.name === 'MongoError' || error.name === 'MongoServerError') &&
+        'code' in error &&
+        error.code === 11000
+      ) {
+        const mongoError = error as {
+          keyPattern?: Record<string, number>;
+          keyValue?: Record<string, unknown>;
+        };
+        const keyPattern = mongoError.keyPattern || {};
+        const keys = Object.keys(keyPattern);
+
+        // Check if it's a registration duplicate (eventId + email or eventId + userId)
+        if (keys.includes('eventId') && (keys.includes('email') || keys.includes('userId'))) {
+          if (keys.includes('email')) {
+            throw new ConflictError('This email is already registered for this event');
+          } else if (keys.includes('userId')) {
+            throw new ConflictError('You are already registered for this event');
+          }
+        }
+      }
+
       throw error;
     } finally {
       session.endSession();
@@ -325,6 +352,33 @@ class RegistrationsService {
       return responsePayload;
     } catch (error) {
       await session.abortTransaction();
+
+      // Handle MongoDB duplicate key errors for registrations
+      if (
+        error &&
+        typeof error === 'object' &&
+        'name' in error &&
+        (error.name === 'MongoError' || error.name === 'MongoServerError') &&
+        'code' in error &&
+        error.code === 11000
+      ) {
+        const mongoError = error as {
+          keyPattern?: Record<string, number>;
+          keyValue?: Record<string, unknown>;
+        };
+        const keyPattern = mongoError.keyPattern || {};
+        const keys = Object.keys(keyPattern);
+
+        // Check if it's a registration duplicate (eventId + email or eventId + userId)
+        if (keys.includes('eventId') && (keys.includes('email') || keys.includes('userId'))) {
+          if (keys.includes('email')) {
+            throw new ConflictError('This email is already registered for the event');
+          } else if (keys.includes('userId')) {
+            throw new ConflictError('You are already registered for this event');
+          }
+        }
+      }
+
       throw error;
     } finally {
       session.endSession();
