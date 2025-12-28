@@ -201,6 +201,28 @@ class RegistrationsService {
         // Check if it's a registration duplicate (eventId + email or eventId + userId)
         if (keys.includes('eventId') && (keys.includes('email') || keys.includes('userId'))) {
           if (keys.includes('email')) {
+            // Try to find existing registration to check payment status
+            const duplicateRegistration = await Registration.findOne({
+              eventId: mongoError.keyValue?.eventId,
+              email: mongoError.keyValue?.email,
+            });
+
+            if (duplicateRegistration) {
+              // If payment is pending, throw specific error
+              if (duplicateRegistration.paymentStatus === 'pending') {
+                throw new ConflictError(
+                  'You have already registered for this event, but payment is still pending. Please check your email to complete the payment.',
+                  REGISTRATIONS_CODES.ERROR_REGISTRATION_PENDING_PAYMENT
+                );
+              }
+              // If payment is completed, throw duplicate error
+              throw new ConflictError(
+                'This email is already registered for this event',
+                REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_EMAIL
+              );
+            }
+
+            // Fallback if registration not found
             throw new ConflictError(
               'This email is already registered for this event',
               REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_EMAIL
@@ -250,15 +272,7 @@ class RegistrationsService {
       }).session(session);
 
       if (existing) {
-        // If registration exists and payment is completed/confirmed, throw error
-        if (existing.status === 'confirmed' || existing.paymentStatus === 'completed') {
-          throw new ConflictError(
-            'This email is already registered for the event',
-            REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_EMAIL
-          );
-        }
-
-        // If registration exists with pending payment, throw specific error
+        // If registration exists with pending payment, throw specific error first
         if (existing.paymentStatus === 'pending') {
           await session.abortTransaction();
           session.endSession();
@@ -306,6 +320,14 @@ class RegistrationsService {
           throw new ConflictError(
             'You have already registered for this event, but payment is still pending. Please check your email to complete the payment.',
             REGISTRATIONS_CODES.ERROR_REGISTRATION_PENDING_PAYMENT
+          );
+        }
+
+        // If registration exists and payment is completed/confirmed, throw error
+        if (existing.status === 'confirmed' || existing.paymentStatus === 'completed') {
+          throw new ConflictError(
+            'This email is already registered for the event',
+            REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_EMAIL
           );
         }
 
@@ -476,9 +498,37 @@ class RegistrationsService {
         // Check if it's a registration duplicate (eventId + email or eventId + userId)
         if (keys.includes('eventId') && (keys.includes('email') || keys.includes('userId'))) {
           if (keys.includes('email')) {
-            throw new ConflictError('This email is already registered for the event');
+            // Try to find existing registration to check payment status
+            const duplicateRegistration = await Registration.findOne({
+              eventId: mongoError.keyValue?.eventId,
+              email: mongoError.keyValue?.email,
+            });
+
+            if (duplicateRegistration) {
+              // If payment is pending, throw specific error
+              if (duplicateRegistration.paymentStatus === 'pending') {
+                throw new ConflictError(
+                  'You have already registered for this event, but payment is still pending. Please check your email to complete the payment.',
+                  REGISTRATIONS_CODES.ERROR_REGISTRATION_PENDING_PAYMENT
+                );
+              }
+              // If payment is completed, throw duplicate error
+              throw new ConflictError(
+                'This email is already registered for the event',
+                REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_EMAIL
+              );
+            }
+
+            // Fallback if registration not found
+            throw new ConflictError(
+              'This email is already registered for the event',
+              REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_EMAIL
+            );
           } else if (keys.includes('userId')) {
-            throw new ConflictError('You are already registered for this event');
+            throw new ConflictError(
+              'You are already registered for this event',
+              REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_USER
+            );
           }
         }
       }
