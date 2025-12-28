@@ -1,6 +1,22 @@
 import { emailConfig } from '../config/env';
 import { logger } from '../config/logger';
 
+/**
+ * Format date to Kyiv timezone
+ */
+const formatKyivDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  return date.toLocaleString('uk-UA', {
+    timeZone: 'Europe/Kyiv',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+};
+
 interface SendEmailInput {
   to: string;
   subject: string;
@@ -47,6 +63,9 @@ class EmailService {
     paymentAmount: number;
     paymentCurrency: string;
     registrationId: string;
+    basePrice?: number;
+    discountAmount?: number;
+    promoCode?: string;
   }): Promise<void> {
     const {
       to,
@@ -57,15 +76,34 @@ class EmailService {
       paymentAmount,
       paymentCurrency,
       registrationId,
+      basePrice,
+      discountAmount,
+      promoCode,
     } = params;
+
+    // Build price breakdown HTML
+    let priceHtml = '';
+    if (basePrice !== undefined && discountAmount !== undefined && discountAmount > 0) {
+      const hasDiscount = discountAmount > 0;
+      priceHtml = `
+        <p><strong>Ціна:</strong></p>
+        <ul style="list-style: none; padding-left: 0;">
+          <li>Базова ціна: ${basePrice.toFixed(2)} ${paymentCurrency}</li>
+          ${hasDiscount ? `<li>Промокод "${promoCode || ''}": -${discountAmount.toFixed(2)} ${paymentCurrency}</li>` : ''}
+          <li style="font-weight: bold; margin-top: 10px; border-top: 1px solid #ddd; padding-top: 10px;">До оплати: ${paymentAmount.toFixed(2)} ${paymentCurrency}</li>
+        </ul>
+      `;
+    } else {
+      priceHtml = `<p><strong>Оплата:</strong> ${paymentAmount.toFixed(2)} ${paymentCurrency}</p>`;
+    }
 
     const html = `
       <h1>Реєстрацію підтверджено</h1>
       <p>Вітаємо, ${name}!</p>
       <p>Вашу реєстрацію на <strong>${eventTitle}</strong> підтверджено.</p>
-      <p><strong>Дата події:</strong> ${new Date(eventDate).toLocaleString('uk-UA')}</p>
+      <p><strong>Дата події:</strong> ${formatKyivDate(eventDate)}</p>
       <p><strong>Місце проведення:</strong> ${eventLocation}</p>
-      <p><strong>Оплата:</strong> ${paymentAmount} ${paymentCurrency}</p>
+      ${priceHtml}
       <p><strong>ID реєстрації:</strong> ${registrationId}</p>
       <p>Дякуємо за реєстрацію!</p>
     `;
@@ -134,6 +172,9 @@ class EmailService {
     paymentCurrency: string;
     paymentLink: string;
     registrationId: string;
+    basePrice?: number;
+    discountAmount?: number;
+    promoCode?: string;
   }): Promise<void> {
     const {
       to,
@@ -145,15 +186,34 @@ class EmailService {
       paymentCurrency,
       paymentLink,
       registrationId,
+      basePrice,
+      discountAmount,
+      promoCode,
     } = params;
+
+    // Build price breakdown HTML
+    let priceHtml = '';
+    if (basePrice !== undefined && discountAmount !== undefined && discountAmount > 0) {
+      const hasDiscount = discountAmount > 0;
+      priceHtml = `
+        <p><strong>Ціна:</strong></p>
+        <ul style="list-style: none; padding-left: 0;">
+          <li>Базова ціна: ${basePrice.toFixed(2)} ${paymentCurrency}</li>
+          ${hasDiscount ? `<li>Промокод "${promoCode || ''}": -${discountAmount.toFixed(2)} ${paymentCurrency}</li>` : ''}
+          <li style="font-weight: bold; margin-top: 10px; border-top: 1px solid #ddd; padding-top: 10px;">До оплати: ${paymentAmount.toFixed(2)} ${paymentCurrency}</li>
+        </ul>
+      `;
+    } else {
+      priceHtml = `<p><strong>Сума до оплати:</strong> ${paymentAmount.toFixed(2)} ${paymentCurrency}</p>`;
+    }
 
     const html = `
       <h1>Завершіть вашу реєстрацію</h1>
       <p>Вітаємо, ${name}!</p>
       <p>Дякуємо за реєстрацію на <strong>${eventTitle}</strong>!</p>
-      <p><strong>Дата події:</strong> ${new Date(eventDate).toLocaleString('uk-UA')}</p>
+      <p><strong>Дата події:</strong> ${formatKyivDate(eventDate)}</p>
       <p><strong>Місце проведення:</strong> ${eventLocation}</p>
-      <p><strong>Сума до оплати:</strong> ${paymentAmount} ${paymentCurrency}</p>
+      ${priceHtml}
       <p><strong>ID реєстрації:</strong> ${registrationId}</p>
       <p>Будь ласка, завершіть оплату, натиснувши на посилання нижче:</p>
       <p style="margin: 30px 0;">

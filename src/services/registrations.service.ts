@@ -274,17 +274,35 @@ class RegistrationsService {
             if (existing.email) {
               const event = await Event.findById(resolvedEventId).lean();
               if (event) {
-                void emailService.sendPaymentLink({
+                // Calculate price breakdown for email
+                const eventBasePrice = event.basePrice ?? eventConfig.basePrice;
+                const existingFinalPrice = existing.finalPrice ?? 0;
+                const discountAmount =
+                  eventBasePrice && existingFinalPrice < eventBasePrice
+                    ? eventBasePrice - existingFinalPrice
+                    : 0;
+
+                const emailParams: Parameters<typeof emailService.sendPaymentLink>[0] = {
                   to: existing.email,
                   name: `${existing.name ?? ''} ${existing.surname ?? ''}`.trim() || 'Participant',
                   eventTitle: event.title,
                   eventDate: event.date.toISOString(),
                   eventLocation: event.location,
-                  paymentAmount: existing.finalPrice ?? 0,
+                  paymentAmount: existingFinalPrice,
                   paymentCurrency: paymentConfig.currency,
                   paymentLink: payment.paymentLink,
                   registrationId: existing._id.toString(),
-                });
+                  basePrice: eventBasePrice,
+                };
+
+                if (discountAmount > 0) {
+                  emailParams.discountAmount = discountAmount;
+                }
+                if (existing.promoCode) {
+                  emailParams.promoCode = existing.promoCode;
+                }
+
+                void emailService.sendPaymentLink(emailParams);
               }
             }
           }
@@ -308,7 +326,7 @@ class RegistrationsService {
         );
       }
 
-      const { finalPrice } = calculatePrice(basePrice, validatedPromo);
+      const { finalPrice, discountAmount } = calculatePrice(basePrice, validatedPromo);
 
       // Validate final price
       if (!isFinite(finalPrice) || finalPrice < 0) {
@@ -362,7 +380,7 @@ class RegistrationsService {
 
         // Send confirmation email for free registration (async, non-blocking)
         if (registration.email && event) {
-          void emailService.sendRegistrationConfirmation({
+          const emailParams: Parameters<typeof emailService.sendRegistrationConfirmation>[0] = {
             to: registration.email,
             name: `${name} ${surname}`.trim() || 'Participant',
             eventTitle: event.title,
@@ -371,7 +389,17 @@ class RegistrationsService {
             paymentAmount: 0,
             paymentCurrency: paymentConfig.currency,
             registrationId: registration._id.toString(),
-          });
+            basePrice,
+          };
+
+          if (discountAmount > 0) {
+            emailParams.discountAmount = discountAmount;
+          }
+          if (validatedPromo?.code) {
+            emailParams.promoCode = validatedPromo.code;
+          }
+
+          void emailService.sendRegistrationConfirmation(emailParams);
         }
 
         return {
@@ -396,7 +424,7 @@ class RegistrationsService {
 
       // Send payment link email (async, non-blocking)
       if (paymentLink && registration.email && event) {
-        void emailService.sendPaymentLink({
+        const emailParams: Parameters<typeof emailService.sendPaymentLink>[0] = {
           to: registration.email,
           name: `${name} ${surname}`.trim() || 'Participant',
           eventTitle: event.title,
@@ -406,7 +434,17 @@ class RegistrationsService {
           paymentCurrency: paymentConfig.currency,
           paymentLink,
           registrationId: registration._id.toString(),
-        });
+          basePrice,
+        };
+
+        if (discountAmount > 0) {
+          emailParams.discountAmount = discountAmount;
+        }
+        if (validatedPromo?.code) {
+          emailParams.promoCode = validatedPromo.code;
+        }
+
+        void emailService.sendPaymentLink(emailParams);
       }
 
       const responsePayload: { registration: RegistrationResponse; paymentLink?: string } = {
