@@ -164,9 +164,8 @@ class RegistrationsService {
         throw new Error('Failed to create registration');
       }
 
-      // Increment registeredCount
-      event.registeredCount += 1;
-      await event.save({ session });
+      // Increment registeredCount (use updateOne to avoid full document validation)
+      await Event.findByIdAndUpdate(event._id, { $inc: { registeredCount: 1 } }, { session });
 
       // Commit transaction
       await session.commitTransaction();
@@ -388,9 +387,8 @@ class RegistrationsService {
 
       // For free registrations, skip payment creation and confirm immediately
       if (isFreeRegistration) {
-        // Increment event registeredCount for free registration
-        event.registeredCount += 1;
-        await event.save({ session });
+        // Increment event registeredCount for free registration (use updateOne to avoid full document validation)
+        await Event.findByIdAndUpdate(event._id, { $inc: { registeredCount: 1 } }, { session });
 
         // Increment promo code usage if used
         if (validatedPromo?._id) {
@@ -586,12 +584,12 @@ class RegistrationsService {
       registration.status = 'cancelled';
       await registration.save({ session });
 
-      // Decrement registeredCount
-      const event = await Event.findById(registration.eventId).session(session);
-      if (event) {
-        event.registeredCount = Math.max(0, event.registeredCount - 1);
-        await event.save({ session });
-      }
+      // Decrement registeredCount (use updateOne to avoid full document validation)
+      await Event.findByIdAndUpdate(
+        registration.eventId,
+        { $inc: { registeredCount: -1 } },
+        { session }
+      );
 
       // Commit transaction
       await session.commitTransaction();
