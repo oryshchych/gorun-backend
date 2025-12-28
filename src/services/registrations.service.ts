@@ -258,20 +258,15 @@ class RegistrationsService {
           );
         }
 
-        // If registration exists with pending payment, return existing payment link
-        if (existing.paymentStatus === 'pending' && existing.paymentId) {
+        // If registration exists with pending payment, throw specific error
+        if (existing.paymentStatus === 'pending') {
           await session.abortTransaction();
           session.endSession();
 
-          const payment = await Payment.findById(existing.paymentId);
-          const responsePayload: { registration: RegistrationResponse; paymentLink?: string } = {
-            registration: this.formatRegistrationResponse(existing.toObject()),
-          };
-          if (payment?.paymentLink) {
-            responsePayload.paymentLink = payment.paymentLink;
-
-            // Resend payment link email (async, non-blocking)
-            if (existing.email) {
+          // Resend payment link email (async, non-blocking) if payment link exists
+          if (existing.paymentId) {
+            const payment = await Payment.findById(existing.paymentId);
+            if (payment?.paymentLink && existing.email) {
               const event = await Event.findById(resolvedEventId).lean();
               if (event) {
                 // Calculate price breakdown for email
@@ -307,7 +302,11 @@ class RegistrationsService {
             }
           }
 
-          return responsePayload;
+          // Throw error with specific code for pending payment
+          throw new ConflictError(
+            'You have already registered for this event, but payment is still pending. Please check your email to complete the payment.',
+            REGISTRATIONS_CODES.ERROR_REGISTRATION_PENDING_PAYMENT
+          );
         }
 
         // If registration exists but payment failed, allow retry by creating new payment
