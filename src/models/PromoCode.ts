@@ -19,7 +19,6 @@ const promoCodeSchema = new Schema<IPromoCode>(
     code: {
       type: String,
       required: [true, 'Promo code is required'],
-      unique: true,
       uppercase: true,
       trim: true,
       maxlength: [50, 'Promo code must not exceed 50 characters'],

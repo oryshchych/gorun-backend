@@ -1,25 +1,15 @@
 import { Request } from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 /**
- * Custom key generator that validates IP addresses
- * Uses express-rate-limit's built-in IP extraction with validation
- * Prevents IP spoofing by validating the IP format
+ * Custom key generator that uses express-rate-limit's ipKeyGenerator helper
+ * This properly handles IPv6 addresses and prevents bypassing rate limits
  * With trust proxy set to 1, Express only trusts the first X-Forwarded-For header
  */
 const keyGenerator = (req: Request): string => {
-  // Get IP from request (Express handles IPv6 normalization with trust proxy)
   const ip = req.ip || req.socket?.remoteAddress || 'unknown';
-
-  // Basic validation - express-rate-limit will handle IPv6 normalization
-  // We just ensure it's not obviously spoofed
-  if (ip === 'unknown' || !ip) {
-    return 'unknown';
-  }
-
-  // Return the IP - express-rate-limit will normalize IPv6 internally
-  // The library validates that we're using IP-based keys properly
-  return ip;
+  // Use express-rate-limit's ipKeyGenerator helper for proper IPv6 handling
+  return ipKeyGenerator(ip);
 };
 
 /**
