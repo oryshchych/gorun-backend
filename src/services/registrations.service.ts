@@ -310,6 +310,17 @@ class RegistrationsService {
 
       const { finalPrice } = calculatePrice(basePrice, validatedPromo);
 
+      // Validate final price
+      if (!isFinite(finalPrice) || finalPrice < 0) {
+        throw new ConflictError(
+          'Invalid event price. Please contact support.',
+          REGISTRATIONS_CODES.ERROR_REGISTRATION_PRICE_NOT_CONFIGURED
+        );
+      }
+
+      // Check if this is a free registration (100% discount)
+      const isFreeRegistration = finalPrice === 0;
+
       const registrationArray = await Registration.create(
         [
           {
@@ -322,8 +333,8 @@ class RegistrationsService {
             phone,
             promoCode: validatedPromo?.code ?? promoCode?.toUpperCase(),
             promoCodeId: validatedPromo?._id,
-            status: 'pending',
-            paymentStatus: 'pending',
+            status: isFreeRegistration ? 'confirmed' : 'pending',
+            paymentStatus: isFreeRegistration ? 'completed' : 'pending',
             registeredAt: new Date(),
             finalPrice,
           },
@@ -336,6 +347,40 @@ class RegistrationsService {
         throw new Error('Failed to create registration');
       }
 
+      // For free registrations, skip payment creation and confirm immediately
+      if (isFreeRegistration) {
+        // Increment event registeredCount for free registration
+        event.registeredCount += 1;
+        await event.save({ session });
+
+        // Increment promo code usage if used
+        if (validatedPromo?._id) {
+          await promoCodesService.incrementUsage(validatedPromo._id.toString(), session);
+        }
+
+        await session.commitTransaction();
+
+        // Send confirmation email for free registration (async, non-blocking)
+        if (registration.email && event) {
+          void emailService.sendRegistrationConfirmation({
+            to: registration.email,
+            name: `${name} ${surname}`.trim() || 'Participant',
+            eventTitle: event.title,
+            eventDate: event.date.toISOString(),
+            eventLocation: event.location,
+            paymentAmount: 0,
+            paymentCurrency: paymentConfig.currency,
+            registrationId: registration._id.toString(),
+          });
+        }
+
+        return {
+          registration: this.formatRegistrationResponse(registration.toObject()),
+          // No paymentLink for free registrations
+        };
+      }
+
+      // For paid registrations, create payment and invoice
       const { payment, paymentLink } = await paymentsService.createPaymentWithInvoice({
         registrationId: registration._id.toString(),
         amount: finalPrice,
