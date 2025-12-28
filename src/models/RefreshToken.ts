@@ -22,7 +22,6 @@ const refreshTokenSchema = new Schema<IRefreshToken, IRefreshTokenModel>(
     token: {
       type: String,
       required: [true, 'Token is required'],
-      unique: true,
     },
     expiresAt: {
       type: Date,

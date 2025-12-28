@@ -1,4 +1,16 @@
-import rateLimit from 'express-rate-limit';
+import { Request } from 'express';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+
+/**
+ * Custom key generator that uses express-rate-limit's ipKeyGenerator helper
+ * This properly handles IPv6 addresses and prevents bypassing rate limits
+ * With trust proxy set to 1, Express only trusts the first X-Forwarded-For header
+ */
+const keyGenerator = (req: Request): string => {
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+  // Use express-rate-limit's ipKeyGenerator helper for proper IPv6 handling
+  return ipKeyGenerator(ip);
+};
 
 /**
  * Rate limiter for authentication endpoints
@@ -12,6 +24,7 @@ export const authLimiter = rateLimit({
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   skipSuccessfulRequests: false, // Count all requests, not just failed ones
+  keyGenerator, // Use custom key generator to prevent IP spoofing
 });
 
 /**
@@ -26,6 +39,7 @@ export const apiLimiter = rateLimit({
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   skipSuccessfulRequests: false, // Count all requests
+  keyGenerator, // Use custom key generator to prevent IP spoofing
 });
 
 /**
@@ -38,6 +52,7 @@ export const registrationLimiter = rateLimit({
   message: 'Too many registration attempts, please try again in a minute',
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator, // Use custom key generator to prevent IP spoofing
 });
 
 /**
@@ -50,4 +65,5 @@ export const promoCodeLimiter = rateLimit({
   message: 'Too many promo code requests, please try again in a minute',
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator, // Use custom key generator to prevent IP spoofing
 });

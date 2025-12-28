@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { IPromoCode, PromoCode } from '../models/PromoCode';
+import { PROMO_CODES_CODES } from '../types/codes';
 import { NotFoundError, ValidationError } from '../types/errors';
 
 class PromoCodesService {
@@ -11,24 +12,39 @@ class PromoCodesService {
     const promoCode = await PromoCode.findOne({ code: normalizedCode });
 
     if (!promoCode) {
-      throw new ValidationError({ promoCode: ['Invalid or expired promo code'] });
+      throw new ValidationError(
+        { promoCode: ['Invalid or expired promo code'] },
+        PROMO_CODES_CODES.ERROR_PROMO_CODE_NOT_FOUND
+      );
     }
 
     if (!promoCode.isActive) {
-      throw new ValidationError({ promoCode: ['Invalid or expired promo code'] });
+      throw new ValidationError(
+        { promoCode: ['Invalid or expired promo code'] },
+        PROMO_CODES_CODES.ERROR_PROMO_CODE_INVALID
+      );
     }
 
     if (promoCode.usedCount >= promoCode.usageLimit) {
-      throw new ValidationError({ promoCode: ['Promo code usage limit reached'] });
+      throw new ValidationError(
+        { promoCode: ['Promo code usage limit reached'] },
+        PROMO_CODES_CODES.ERROR_PROMO_CODE_USAGE_LIMIT_REACHED
+      );
     }
 
     if (promoCode.expirationDate && promoCode.expirationDate < new Date()) {
-      throw new ValidationError({ promoCode: ['Promo code has expired'] });
+      throw new ValidationError(
+        { promoCode: ['Promo code has expired'] },
+        PROMO_CODES_CODES.ERROR_PROMO_CODE_EXPIRED
+      );
     }
 
     if (promoCode.eventId && eventId) {
       if (!mongoose.Types.ObjectId.isValid(eventId) || promoCode.eventId.toString() !== eventId) {
-        throw new ValidationError({ promoCode: ['Promo code is not valid for this event'] });
+        throw new ValidationError(
+          { promoCode: ['Promo code is not valid for this event'] },
+          PROMO_CODES_CODES.ERROR_PROMO_CODE_NOT_APPLICABLE
+        );
       }
     }
 
@@ -46,7 +62,7 @@ class PromoCodesService {
     );
 
     if (result.matchedCount === 0) {
-      throw new NotFoundError('Promo code not found');
+      throw new NotFoundError('Promo code not found', PROMO_CODES_CODES.ERROR_PROMO_CODE_NOT_FOUND);
     }
   }
 
@@ -61,7 +77,7 @@ class PromoCodesService {
     );
 
     if (result.matchedCount === 0) {
-      throw new NotFoundError('Promo code not found');
+      throw new NotFoundError('Promo code not found', PROMO_CODES_CODES.ERROR_PROMO_CODE_NOT_FOUND);
     }
 
     // Ensure usedCount doesn't go below 0

@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { frontendConfig, paymentConfig, serverConfig } from '../config/env';
 import { logger } from '../config/logger';
 import { IPayment, Payment } from '../models/Payment';
+import { PAYMENTS_CODES } from '../types/codes';
 import { AppError } from '../types/errors';
 import monobankService from './monobank.service';
 
@@ -31,7 +32,11 @@ class PaymentsService {
     session,
   }: CreatePaymentParams): Promise<{ payment: IPayment; paymentLink?: string }> {
     if (!paymentConfig.plataApiKey) {
-      throw new AppError('Monobank API key is not configured', 500);
+      throw new AppError(
+        'Monobank API key is not configured',
+        500,
+        PAYMENTS_CODES.ERROR_PAYMENT_EXTERNAL_API_ERROR
+      );
     }
 
     // Create payment record first (pending)
@@ -49,7 +54,7 @@ class PaymentsService {
 
     const payment = paymentArray[0];
     if (!payment) {
-      throw new AppError('Failed to create payment', 500);
+      throw new AppError('Failed to create payment', 500, PAYMENTS_CODES.ERROR_PAYMENT_FAILED);
     }
 
     const invoice = await this.createPlataInvoice({
@@ -102,11 +107,15 @@ class PaymentsService {
   async checkPaymentStatus(paymentId: string): Promise<Record<string, unknown> | null> {
     const payment = await Payment.findById(paymentId);
     if (!payment) {
-      throw new AppError('Payment not found', 404);
+      throw new AppError('Payment not found', 404, PAYMENTS_CODES.ERROR_PAYMENT_NOT_FOUND);
     }
 
     if (!payment.plataMonoInvoiceId) {
-      throw new AppError('Payment has no invoice ID', 400);
+      throw new AppError(
+        'Payment has no invoice ID',
+        400,
+        PAYMENTS_CODES.ERROR_PAYMENT_INVOICE_ID_MISSING
+      );
     }
 
     const status = await monobankService.getInvoiceStatus(payment.plataMonoInvoiceId);
@@ -125,15 +134,23 @@ class PaymentsService {
   ): Promise<IPayment> {
     const payment = await Payment.findById(paymentId).session(session || null);
     if (!payment) {
-      throw new AppError('Payment not found', 404);
+      throw new AppError('Payment not found', 404, PAYMENTS_CODES.ERROR_PAYMENT_NOT_FOUND);
     }
 
     if (payment.status !== 'completed') {
-      throw new AppError('Only completed payments can be refunded', 400);
+      throw new AppError(
+        'Only completed payments can be refunded',
+        400,
+        PAYMENTS_CODES.ERROR_PAYMENT_FAILED
+      );
     }
 
     if (!payment.plataMonoInvoiceId) {
-      throw new AppError('Payment has no invoice ID', 400);
+      throw new AppError(
+        'Payment has no invoice ID',
+        400,
+        PAYMENTS_CODES.ERROR_PAYMENT_INVOICE_ID_MISSING
+      );
     }
 
     // Use provided amount or full payment amount
@@ -146,7 +163,11 @@ class PaymentsService {
     );
 
     if (!cancelResult) {
-      throw new AppError('Failed to cancel invoice with Monobank', 502);
+      throw new AppError(
+        'Failed to cancel invoice with Monobank',
+        502,
+        PAYMENTS_CODES.ERROR_PAYMENT_EXTERNAL_API_ERROR
+      );
     }
 
     // Update payment status to refunded
@@ -166,15 +187,23 @@ class PaymentsService {
   async getReceipt(paymentId: string): Promise<Record<string, unknown> | null> {
     const payment = await Payment.findById(paymentId);
     if (!payment) {
-      throw new AppError('Payment not found', 404);
+      throw new AppError('Payment not found', 404, PAYMENTS_CODES.ERROR_PAYMENT_NOT_FOUND);
     }
 
     if (!payment.plataMonoInvoiceId) {
-      throw new AppError('Payment has no invoice ID', 400);
+      throw new AppError(
+        'Payment has no invoice ID',
+        400,
+        PAYMENTS_CODES.ERROR_PAYMENT_INVOICE_ID_MISSING
+      );
     }
 
     if (payment.status !== 'completed') {
-      throw new AppError('Receipt is only available for completed payments', 400);
+      throw new AppError(
+        'Receipt is only available for completed payments',
+        400,
+        PAYMENTS_CODES.ERROR_PAYMENT_FAILED
+      );
     }
 
     const receipt = await monobankService.getInvoiceReceipt(payment.plataMonoInvoiceId);
@@ -193,10 +222,39 @@ class PaymentsService {
   }): Promise<PlataInvoiceResponse> {
     const { amount, customerName, eventTitle, registrationId } = params;
 
+    // Validate amount before processing
+    if (!amount || amount <= 0 || !isFinite(amount)) {
+      logger.error('Invalid amount for Monobank invoice', {
+        amount,
+        registrationId,
+      });
+      throw new AppError('Invalid payment amount', 400, PAYMENTS_CODES.ERROR_PAYMENT_FAILED);
+    }
+
+    // Monobank minimum amount is 1 kopiyka (0.01 UAH)
+    // Convert to kopiykas and validate
+    const amountInKopiykas = Math.round(amount * 100);
+    if (amountInKopiykas < 1) {
+      logger.error('Amount too small for Monobank invoice', {
+        amount,
+        amountInKopiykas,
+        registrationId,
+      });
+      throw new AppError(
+        'Payment amount is too small (minimum 0.01 UAH)',
+        400,
+        PAYMENTS_CODES.ERROR_PAYMENT_FAILED
+      );
+    }
+
     // Check if API key is configured
     if (!paymentConfig.plataApiKey) {
       logger.error('Monobank API key is not configured');
-      throw new AppError('Payment service is not configured', 500);
+      throw new AppError(
+        'Payment service is not configured',
+        500,
+        PAYMENTS_CODES.ERROR_PAYMENT_EXTERNAL_API_ERROR
+      );
     }
 
     const webhookUrl =
@@ -205,12 +263,12 @@ class PaymentsService {
     // Monobank API expects amount in kopiykas (minimum units)
     // ccy: 980 is ISO 4217 code for UAH (Ukrainian Hryvnia)
     const body = {
-      amount: Math.round(amount * 100), // kopiykas
+      amount: amountInKopiykas, // kopiykas
       ccy: 980, // UAH (ISO 4217)
       merchantPaymInfo: {}, // Required for PPRO integration, can be empty
-      redirectUrl: `${frontendConfig.successUrl}?registrationId=${registrationId}`,
-      successUrl: `${frontendConfig.successUrl}?registrationId=${registrationId}`,
-      failUrl: `${frontendConfig.failureUrl}?registrationId=${registrationId}`,
+      redirectUrl: `${frontendConfig.url}`,
+      successUrl: `${frontendConfig.url}?tab=participants`,
+      failUrl: `${frontendConfig.url}?tab=registration`,
       webHookUrl: webhookUrl,
       merchantData: {
         registrationId,
@@ -252,16 +310,40 @@ class PaymentsService {
       const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
 
       if (!response.ok) {
+        const errorData = data as { errCode?: string; errText?: string; errDescription?: string };
+        const errorCode = errorData.errCode;
+        const errorText = errorData.errText || errorData.errDescription || 'Unknown error';
+
         logger.error('Monobank invoice creation failed', {
           status: response.status,
           statusText: response.statusText,
+          errorCode,
+          errorText,
           data,
           registrationId,
+          amount: body.amount,
+          originalAmount: amount,
         });
-        throw new AppError(
-          `Failed to create payment link: ${(data as { errDescription?: string }).errDescription || 'Unknown error'}`,
-          502
-        );
+
+        // Handle specific Monobank error codes
+        let userMessage = 'Failed to create payment link';
+        let errorCodeType: (typeof PAYMENTS_CODES)[keyof typeof PAYMENTS_CODES] =
+          PAYMENTS_CODES.ERROR_PAYMENT_EXTERNAL_API_ERROR;
+
+        if (errorCode === '1001') {
+          userMessage = 'Invalid payment amount. Please contact support.';
+          errorCodeType = PAYMENTS_CODES.ERROR_PAYMENT_FAILED;
+        } else if (errorCode === '1002') {
+          userMessage = 'Payment currency is not supported';
+          errorCodeType = PAYMENTS_CODES.ERROR_PAYMENT_EXTERNAL_API_ERROR;
+        } else if (errorCode === '1003') {
+          userMessage = 'Invalid merchant configuration';
+          errorCodeType = PAYMENTS_CODES.ERROR_PAYMENT_EXTERNAL_API_ERROR;
+        } else if (errorText) {
+          userMessage = `Payment service error: ${errorText}`;
+        }
+
+        throw new AppError(userMessage, 502, errorCodeType);
       }
 
       const invoiceId = (data.invoiceId as string | undefined) || (data.id as string | undefined);
@@ -287,7 +369,11 @@ class PaymentsService {
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
           logger.error('Monobank API request timeout', { registrationId, apiUrl });
-          throw new AppError('Payment service timeout. Please try again.', 504);
+          throw new AppError(
+            'Payment service timeout. Please try again.',
+            504,
+            PAYMENTS_CODES.ERROR_PAYMENT_EXTERNAL_API_ERROR
+          );
         }
 
         if (error.message.includes('fetch failed') || error.message.includes('ECONNREFUSED')) {
@@ -299,7 +385,8 @@ class PaymentsService {
           });
           throw new AppError(
             'Unable to connect to payment service. Please check your network connection or try again later.',
-            503
+            503,
+            PAYMENTS_CODES.ERROR_PAYMENT_EXTERNAL_API_ERROR
           );
         }
 
@@ -314,7 +401,11 @@ class PaymentsService {
         registrationId,
         apiUrl,
       });
-      throw new AppError('Failed to create payment link. Please try again.', 500);
+      throw new AppError(
+        'Failed to create payment link. Please try again.',
+        500,
+        PAYMENTS_CODES.ERROR_PAYMENT_EXTERNAL_API_ERROR
+      );
     }
   }
 }

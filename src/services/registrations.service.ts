@@ -3,6 +3,7 @@ import { eventConfig, paymentConfig } from '../config/env';
 import { Event } from '../models/Event';
 import { IPayment, Payment } from '../models/Payment';
 import { Registration } from '../models/Registration';
+import { EVENTS_CODES, REGISTRATIONS_CODES } from '../types/codes';
 import { AppError, ConflictError, ForbiddenError, NotFoundError } from '../types/errors';
 import {
   PaginatedResponse,
@@ -11,6 +12,7 @@ import {
 } from '../utils/pagination.util';
 import { calculatePrice } from '../utils/pricing.util';
 import emailService from './email.service';
+import monobankService from './monobank.service';
 import paymentsService from './payments.service';
 import promoCodesService from './promoCodes.service';
 
@@ -100,7 +102,7 @@ class RegistrationsService {
     const { eventId } = input;
 
     if (!mongoose.Types.ObjectId.isValid(eventId)) {
-      throw new NotFoundError('Invalid event ID');
+      throw new NotFoundError('Invalid event ID', EVENTS_CODES.ERROR_EVENTS_INVALID_ID);
     }
 
     // Start a session for transaction
@@ -112,12 +114,15 @@ class RegistrationsService {
       const event = await Event.findById(eventId).session(session);
 
       if (!event) {
-        throw new NotFoundError('Event not found');
+        throw new NotFoundError('Event not found', EVENTS_CODES.ERROR_EVENTS_NOT_FOUND);
       }
 
       // Check if event date is in the future
       if (event.date <= new Date()) {
-        throw new ConflictError('Cannot register for past events');
+        throw new ConflictError(
+          'Cannot register for past events',
+          REGISTRATIONS_CODES.ERROR_REGISTRATION_EVENT_PAST
+        );
       }
 
       // Check if user is already registered
@@ -127,12 +132,18 @@ class RegistrationsService {
       }).session(session);
 
       if (existingRegistration) {
-        throw new ConflictError('You are already registered for this event');
+        throw new ConflictError(
+          'You are already registered for this event',
+          REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_USER
+        );
       }
 
       // Check capacity
       if (!event.hasAvailableCapacity()) {
-        throw new ConflictError('Event has reached full capacity');
+        throw new ConflictError(
+          'Event has reached full capacity',
+          REGISTRATIONS_CODES.ERROR_REGISTRATION_EVENT_FULL
+        );
       }
 
       // Create registration
@@ -154,9 +165,8 @@ class RegistrationsService {
         throw new Error('Failed to create registration');
       }
 
-      // Increment registeredCount
-      event.registeredCount += 1;
-      await event.save({ session });
+      // Increment registeredCount (use updateOne to avoid full document validation)
+      await Event.findByIdAndUpdate(event._id, { $inc: { registeredCount: 1 } }, { session });
 
       // Commit transaction
       await session.commitTransaction();
@@ -171,6 +181,61 @@ class RegistrationsService {
     } catch (error) {
       // Rollback transaction on error
       await session.abortTransaction();
+
+      // Handle MongoDB duplicate key errors for registrations
+      if (
+        error &&
+        typeof error === 'object' &&
+        'name' in error &&
+        (error.name === 'MongoError' || error.name === 'MongoServerError') &&
+        'code' in error &&
+        error.code === 11000
+      ) {
+        const mongoError = error as {
+          keyPattern?: Record<string, number>;
+          keyValue?: Record<string, unknown>;
+        };
+        const keyPattern = mongoError.keyPattern || {};
+        const keys = Object.keys(keyPattern);
+
+        // Check if it's a registration duplicate (eventId + email or eventId + userId)
+        if (keys.includes('eventId') && (keys.includes('email') || keys.includes('userId'))) {
+          if (keys.includes('email')) {
+            // Try to find existing registration to check payment status
+            const duplicateRegistration = await Registration.findOne({
+              eventId: mongoError.keyValue?.eventId,
+              email: mongoError.keyValue?.email,
+            });
+
+            if (duplicateRegistration) {
+              // If payment is pending, throw specific error
+              if (duplicateRegistration.paymentStatus === 'pending') {
+                throw new ConflictError(
+                  'You have already registered for this event, but payment is still pending. Please check your email to complete the payment.',
+                  REGISTRATIONS_CODES.ERROR_REGISTRATION_PENDING_PAYMENT
+                );
+              }
+              // If payment is completed, throw duplicate error
+              throw new ConflictError(
+                'This email is already registered for this event',
+                REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_EMAIL
+              );
+            }
+
+            // Fallback if registration not found
+            throw new ConflictError(
+              'This email is already registered for this event',
+              REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_EMAIL
+            );
+          } else if (keys.includes('userId')) {
+            throw new ConflictError(
+              'You are already registered for this event',
+              REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_USER
+            );
+          }
+        }
+      }
+
       throw error;
     } finally {
       session.endSession();
@@ -193,11 +258,11 @@ class RegistrationsService {
     try {
       const event = await Event.findById(resolvedEventId).session(session);
       if (!event) {
-        throw new NotFoundError('Event not found');
+        throw new NotFoundError('Event not found', EVENTS_CODES.ERROR_EVENTS_NOT_FOUND);
       }
 
       if (!event.hasAvailableCapacity()) {
-        throw new ConflictError('Event is full');
+        throw new ConflictError('Event is full', REGISTRATIONS_CODES.ERROR_REGISTRATION_EVENT_FULL);
       }
 
       // Check if registration already exists for this email and event
@@ -208,46 +273,213 @@ class RegistrationsService {
 
       if (existing) {
         // If registration exists and payment is completed/confirmed, throw error
-        if (existing.status === 'confirmed' || existing.paymentStatus === 'completed') {
-          throw new ConflictError('This email is already registered for the event');
+        if (existing.status === 'confirmed' && existing.paymentStatus === 'completed') {
+          await session.abortTransaction();
+          session.endSession();
+          throw new ConflictError(
+            'This email is already registered for the event',
+            REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_EMAIL
+          );
         }
 
-        // If registration exists with pending payment, return existing payment link
-        if (existing.paymentStatus === 'pending' && existing.paymentId) {
+        // If registration exists with pending or failed payment, return payment link
+        if (existing.paymentStatus === 'pending' || existing.paymentStatus === 'failed') {
+          // Validate promo code and calculate price (same as new registration)
+          const validatedPromo = promoCode
+            ? await promoCodesService.validate(promoCode, resolvedEventId)
+            : null;
+
+          const basePrice = event.basePrice ?? eventConfig.basePrice;
+          if (basePrice === undefined) {
+            await session.abortTransaction();
+            session.endSession();
+            throw new ConflictError(
+              'Event price is not configured',
+              REGISTRATIONS_CODES.ERROR_REGISTRATION_PRICE_NOT_CONFIGURED
+            );
+          }
+
+          const { finalPrice, discountAmount } = calculatePrice(basePrice, validatedPromo);
+
+          // Special case: If new registration is free (100% discount), cancel previous payment and confirm registration
+          if (finalPrice === 0) {
+            // Cancel previous payment if it exists and is pending
+            if (existing.paymentId) {
+              const previousPayment = await Payment.findById(existing.paymentId);
+              if (
+                previousPayment &&
+                previousPayment.status === 'pending' &&
+                previousPayment.plataMonoInvoiceId
+              ) {
+                // Try to cancel the invoice in Monobank (non-blocking, log errors but don't fail)
+                try {
+                  await monobankService.cancelInvoice(previousPayment.plataMonoInvoiceId);
+                  // Update payment status to failed (since it was cancelled)
+                  previousPayment.status = 'failed';
+                  await previousPayment.save();
+                } catch (error) {
+                  // Log error but continue - we'll still confirm the registration
+                  // The payment will remain pending in Monobank, but registration will be confirmed
+                }
+              }
+            }
+
+            // Update existing registration to confirmed with free promo code
+            existing.name = name;
+            existing.surname = surname;
+            existing.city = city;
+            if (runningClub) {
+              existing.runningClub = runningClub;
+            }
+            if (phone) {
+              existing.phone = phone;
+            }
+            if (validatedPromo?.code) {
+              existing.promoCode = validatedPromo.code;
+            } else if (promoCode) {
+              existing.promoCode = promoCode.toUpperCase();
+            }
+            if (validatedPromo?._id) {
+              existing.promoCodeId = validatedPromo._id;
+            }
+            existing.finalPrice = 0;
+            existing.status = 'confirmed';
+            existing.paymentStatus = 'completed';
+            await existing.save({ session });
+
+            // Increment event registeredCount
+            await Event.findByIdAndUpdate(event._id, { $inc: { registeredCount: 1 } }, { session });
+
+            // Increment promo code usage if used
+            if (validatedPromo?._id) {
+              await promoCodesService.incrementUsage(validatedPromo._id.toString(), session);
+            }
+
+            await session.commitTransaction();
+
+            // Send confirmation email for free registration (async, non-blocking)
+            if (existing.email && event) {
+              const emailParams: Parameters<typeof emailService.sendRegistrationConfirmation>[0] = {
+                to: existing.email,
+                name: `${name} ${surname}`.trim() || 'Participant',
+                eventTitle: event.title,
+                eventDate: event.date.toISOString(),
+                eventLocation: event.location,
+                paymentAmount: 0,
+                paymentCurrency: paymentConfig.currency,
+                registrationId: existing._id.toString(),
+                basePrice,
+              };
+
+              if (discountAmount > 0) {
+                emailParams.discountAmount = discountAmount;
+              }
+              if (validatedPromo?.code) {
+                emailParams.promoCode = validatedPromo.code;
+              }
+
+              void emailService.sendRegistrationConfirmation(emailParams);
+            }
+
+            return {
+              registration: this.formatRegistrationResponse(existing.toObject()),
+              // No paymentLink for free registrations
+            };
+          }
+
+          // If not free registration, continue with payment link logic
           await session.abortTransaction();
           session.endSession();
 
-          const payment = await Payment.findById(existing.paymentId);
-          const responsePayload: { registration: RegistrationResponse; paymentLink?: string } = {
-            registration: this.formatRegistrationResponse(existing.toObject()),
-          };
-          if (payment?.paymentLink) {
-            responsePayload.paymentLink = payment.paymentLink;
-
-            // Resend payment link email (async, non-blocking)
-            if (existing.email) {
-              const event = await Event.findById(resolvedEventId).lean();
-              if (event) {
-                void emailService.sendPaymentLink({
-                  to: existing.email,
-                  name: `${existing.name ?? ''} ${existing.surname ?? ''}`.trim() || 'Participant',
-                  eventTitle: event.title,
-                  eventDate: event.date.toISOString(),
-                  eventLocation: event.location,
-                  paymentAmount: existing.finalPrice ?? 0,
-                  paymentCurrency: paymentConfig.currency,
-                  paymentLink: payment.paymentLink,
-                  registrationId: existing._id.toString(),
-                });
+          // Check if existing payment link is still valid
+          let paymentLink: string | undefined;
+          if (existing.paymentId) {
+            const payment = await Payment.findById(existing.paymentId);
+            // If payment exists, has paymentLink, and is still pending in our DB
+            if (payment?.paymentLink && payment.status === 'pending') {
+              // Verify with Monobank API that invoice is still valid
+              // Valid statuses: 'created', 'processing' (can still be paid)
+              // Invalid statuses: 'success', 'failure', 'expired', 'hold'
+              if (payment.plataMonoInvoiceId) {
+                try {
+                  const invoiceStatus = await monobankService.getInvoiceStatus(
+                    payment.plataMonoInvoiceId
+                  );
+                  const monobankStatus = invoiceStatus?.status as string | undefined;
+                  // Only use existing link if invoice is still active (created or processing)
+                  if (monobankStatus === 'created' || monobankStatus === 'processing') {
+                    paymentLink = payment.paymentLink;
+                  }
+                  // If invoice is expired/failed, we'll create a new one below
+                } catch (error) {
+                  // If API call fails, assume link is invalid and create new one
+                  // (better to create new payment than return potentially invalid link)
+                }
+              } else {
+                // If no invoice ID, payment link might be invalid
+                // Create new payment to be safe
               }
             }
           }
 
-          return responsePayload;
-        }
+          // If no valid payment link exists, create a new payment
+          if (!paymentLink) {
+            // Update existing registration with new data if needed
+            existing.name = name;
+            existing.surname = surname;
+            existing.city = city;
+            if (runningClub) {
+              existing.runningClub = runningClub;
+            }
+            if (phone) {
+              existing.phone = phone;
+            }
+            if (validatedPromo?.code) {
+              existing.promoCode = validatedPromo.code;
+            } else if (promoCode) {
+              existing.promoCode = promoCode.toUpperCase();
+            }
+            if (validatedPromo?._id) {
+              existing.promoCodeId = validatedPromo._id;
+            }
+            existing.finalPrice = finalPrice;
+            existing.paymentStatus = 'pending';
+            await existing.save();
 
-        // If registration exists but payment failed, allow retry by creating new payment
-        // (fall through to create new payment)
+            // Create new payment
+            const newSession = await mongoose.startSession();
+            newSession.startTransaction();
+            try {
+              const { payment, paymentLink: newPaymentLink } =
+                await paymentsService.createPaymentWithInvoice({
+                  registrationId: existing._id.toString(),
+                  amount: finalPrice,
+                  customerName: `${name} ${surname}`.trim(),
+                  eventTitle: event.title,
+                  session: newSession,
+                });
+
+              existing.paymentId = payment._id.toString();
+              await existing.save({ session: newSession });
+              await newSession.commitTransaction();
+              paymentLink = newPaymentLink;
+            } catch (error) {
+              await newSession.abortTransaction();
+              throw error;
+            } finally {
+              newSession.endSession();
+            }
+          }
+
+          // Return existing registration with payment link (no email sent)
+          const response: { registration: RegistrationResponse; paymentLink?: string } = {
+            registration: this.formatRegistrationResponse(existing.toObject()),
+          };
+          if (paymentLink) {
+            response.paymentLink = paymentLink;
+          }
+          return response;
+        }
       }
 
       const validatedPromo = promoCode
@@ -256,10 +488,24 @@ class RegistrationsService {
 
       const basePrice = event.basePrice ?? eventConfig.basePrice;
       if (basePrice === undefined) {
-        throw new ConflictError('Event price is not configured');
+        throw new ConflictError(
+          'Event price is not configured',
+          REGISTRATIONS_CODES.ERROR_REGISTRATION_PRICE_NOT_CONFIGURED
+        );
       }
 
-      const { finalPrice } = calculatePrice(basePrice, validatedPromo);
+      const { finalPrice, discountAmount } = calculatePrice(basePrice, validatedPromo);
+
+      // Validate final price
+      if (!isFinite(finalPrice) || finalPrice < 0) {
+        throw new ConflictError(
+          'Invalid event price. Please contact support.',
+          REGISTRATIONS_CODES.ERROR_REGISTRATION_PRICE_NOT_CONFIGURED
+        );
+      }
+
+      // Check if this is a free registration (100% discount)
+      const isFreeRegistration = finalPrice === 0;
 
       const registrationArray = await Registration.create(
         [
@@ -273,8 +519,8 @@ class RegistrationsService {
             phone,
             promoCode: validatedPromo?.code ?? promoCode?.toUpperCase(),
             promoCodeId: validatedPromo?._id,
-            status: 'pending',
-            paymentStatus: 'pending',
+            status: isFreeRegistration ? 'confirmed' : 'pending',
+            paymentStatus: isFreeRegistration ? 'completed' : 'pending',
             registeredAt: new Date(),
             finalPrice,
           },
@@ -287,6 +533,49 @@ class RegistrationsService {
         throw new Error('Failed to create registration');
       }
 
+      // For free registrations, skip payment creation and confirm immediately
+      if (isFreeRegistration) {
+        // Increment event registeredCount for free registration (use updateOne to avoid full document validation)
+        await Event.findByIdAndUpdate(event._id, { $inc: { registeredCount: 1 } }, { session });
+
+        // Increment promo code usage if used
+        if (validatedPromo?._id) {
+          await promoCodesService.incrementUsage(validatedPromo._id.toString(), session);
+        }
+
+        await session.commitTransaction();
+
+        // Send confirmation email for free registration (async, non-blocking)
+        if (registration.email && event) {
+          const emailParams: Parameters<typeof emailService.sendRegistrationConfirmation>[0] = {
+            to: registration.email,
+            name: `${name} ${surname}`.trim() || 'Participant',
+            eventTitle: event.title,
+            eventDate: event.date.toISOString(),
+            eventLocation: event.location,
+            paymentAmount: 0,
+            paymentCurrency: paymentConfig.currency,
+            registrationId: registration._id.toString(),
+            basePrice,
+          };
+
+          if (discountAmount > 0) {
+            emailParams.discountAmount = discountAmount;
+          }
+          if (validatedPromo?.code) {
+            emailParams.promoCode = validatedPromo.code;
+          }
+
+          void emailService.sendRegistrationConfirmation(emailParams);
+        }
+
+        return {
+          registration: this.formatRegistrationResponse(registration.toObject()),
+          // No paymentLink for free registrations
+        };
+      }
+
+      // For paid registrations, create payment and invoice
       const { payment, paymentLink } = await paymentsService.createPaymentWithInvoice({
         registrationId: registration._id.toString(),
         amount: finalPrice,
@@ -302,7 +591,7 @@ class RegistrationsService {
 
       // Send payment link email (async, non-blocking)
       if (paymentLink && registration.email && event) {
-        void emailService.sendPaymentLink({
+        const emailParams: Parameters<typeof emailService.sendPaymentLink>[0] = {
           to: registration.email,
           name: `${name} ${surname}`.trim() || 'Participant',
           eventTitle: event.title,
@@ -312,7 +601,17 @@ class RegistrationsService {
           paymentCurrency: paymentConfig.currency,
           paymentLink,
           registrationId: registration._id.toString(),
-        });
+          basePrice,
+        };
+
+        if (discountAmount > 0) {
+          emailParams.discountAmount = discountAmount;
+        }
+        if (validatedPromo?.code) {
+          emailParams.promoCode = validatedPromo.code;
+        }
+
+        void emailService.sendPaymentLink(emailParams);
       }
 
       const responsePayload: { registration: RegistrationResponse; paymentLink?: string } = {
@@ -325,6 +624,139 @@ class RegistrationsService {
       return responsePayload;
     } catch (error) {
       await session.abortTransaction();
+
+      // Handle MongoDB duplicate key errors for registrations
+      if (
+        error &&
+        typeof error === 'object' &&
+        'name' in error &&
+        (error.name === 'MongoError' || error.name === 'MongoServerError') &&
+        'code' in error &&
+        error.code === 11000
+      ) {
+        const mongoError = error as {
+          keyPattern?: Record<string, number>;
+          keyValue?: Record<string, unknown>;
+        };
+        const keyPattern = mongoError.keyPattern || {};
+        const keys = Object.keys(keyPattern);
+
+        // Check if it's a registration duplicate (eventId + email or eventId + userId)
+        if (keys.includes('eventId') && (keys.includes('email') || keys.includes('userId'))) {
+          if (keys.includes('email')) {
+            // Try to find existing registration to check payment status
+            const duplicateRegistration = await Registration.findOne({
+              eventId: mongoError.keyValue?.eventId,
+              email: mongoError.keyValue?.email,
+            });
+
+            if (duplicateRegistration) {
+              // If payment is completed and registration is confirmed, throw duplicate error
+              if (
+                duplicateRegistration.status === 'confirmed' &&
+                duplicateRegistration.paymentStatus === 'completed'
+              ) {
+                throw new ConflictError(
+                  'This email is already registered for the event',
+                  REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_EMAIL
+                );
+              }
+
+              // If payment is pending or failed, return payment link (race condition case)
+              if (
+                duplicateRegistration.paymentStatus === 'pending' ||
+                duplicateRegistration.paymentStatus === 'failed'
+              ) {
+                let paymentLink: string | undefined;
+                if (duplicateRegistration.paymentId) {
+                  const payment = await Payment.findById(duplicateRegistration.paymentId);
+                  // If payment exists, has paymentLink, and is still pending in our DB
+                  if (payment?.paymentLink && payment.status === 'pending') {
+                    // Verify with Monobank API that invoice is still valid
+                    // Valid statuses: 'created', 'processing' (can still be paid)
+                    // Invalid statuses: 'success', 'failure', 'expired', 'hold'
+                    if (payment.plataMonoInvoiceId) {
+                      try {
+                        const invoiceStatus = await monobankService.getInvoiceStatus(
+                          payment.plataMonoInvoiceId
+                        );
+                        const monobankStatus = invoiceStatus?.status as string | undefined;
+                        // Only use existing link if invoice is still active (created or processing)
+                        if (monobankStatus === 'created' || monobankStatus === 'processing') {
+                          paymentLink = payment.paymentLink;
+                        }
+                        // If invoice is expired/failed, we'll create a new one below
+                      } catch (error) {
+                        // If API call fails, assume link is invalid and create new one
+                        // (better to create new payment than return potentially invalid link)
+                      }
+                    }
+                  }
+                }
+
+                // If no valid payment link exists, we need to create a new one
+                // But we don't have validatedPromo/finalPrice here, so use existing registration's finalPrice
+                if (!paymentLink && duplicateRegistration.finalPrice !== undefined) {
+                  const newSession = await mongoose.startSession();
+                  newSession.startTransaction();
+                  try {
+                    const event = await Event.findById(duplicateRegistration.eventId).lean();
+                    if (event) {
+                      const { payment, paymentLink: newPaymentLink } =
+                        await paymentsService.createPaymentWithInvoice({
+                          registrationId: duplicateRegistration._id.toString(),
+                          amount: duplicateRegistration.finalPrice,
+                          customerName:
+                            `${duplicateRegistration.name ?? ''} ${duplicateRegistration.surname ?? ''}`.trim() ||
+                            'Participant',
+                          eventTitle: event.title,
+                          session: newSession,
+                        });
+
+                      duplicateRegistration.paymentId = payment._id.toString();
+                      duplicateRegistration.paymentStatus = 'pending';
+                      await duplicateRegistration.save({ session: newSession });
+                      await newSession.commitTransaction();
+                      paymentLink = newPaymentLink;
+                    }
+                  } catch (createError) {
+                    await newSession.abortTransaction();
+                    // If payment creation fails, just return existing registration without payment link
+                  } finally {
+                    newSession.endSession();
+                  }
+                }
+
+                const response: { registration: RegistrationResponse; paymentLink?: string } = {
+                  registration: this.formatRegistrationResponse(duplicateRegistration.toObject()),
+                };
+                if (paymentLink) {
+                  response.paymentLink = paymentLink;
+                }
+                return response;
+              }
+
+              // Fallback: throw duplicate error
+              throw new ConflictError(
+                'This email is already registered for the event',
+                REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_EMAIL
+              );
+            }
+
+            // Fallback if registration not found
+            throw new ConflictError(
+              'This email is already registered for the event',
+              REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_EMAIL
+            );
+          } else if (keys.includes('userId')) {
+            throw new ConflictError(
+              'You are already registered for this event',
+              REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_USER
+            );
+          }
+        }
+      }
+
       throw error;
     } finally {
       session.endSession();
@@ -337,7 +769,10 @@ class RegistrationsService {
    */
   async cancelRegistration(id: string, userId: string): Promise<void> {
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new NotFoundError('Invalid registration ID');
+      throw new NotFoundError(
+        'Invalid registration ID',
+        REGISTRATIONS_CODES.ERROR_REGISTRATION_INVALID_ID
+      );
     }
 
     // Start a session for transaction
@@ -349,29 +784,38 @@ class RegistrationsService {
       const registration = await Registration.findById(id).session(session);
 
       if (!registration) {
-        throw new NotFoundError('Registration not found');
+        throw new NotFoundError(
+          'Registration not found',
+          REGISTRATIONS_CODES.ERROR_REGISTRATION_NOT_FOUND
+        );
       }
 
       // Check ownership
       if (!registration.userId || registration.userId.toString() !== userId) {
-        throw new ForbiddenError('You are not authorized to cancel this registration');
+        throw new ForbiddenError(
+          'You are not authorized to cancel this registration',
+          REGISTRATIONS_CODES.ERROR_REGISTRATION_FORBIDDEN
+        );
       }
 
       // Check if already cancelled
       if (registration.status === 'cancelled') {
-        throw new ConflictError('Registration is already cancelled');
+        throw new ConflictError(
+          'Registration is already cancelled',
+          REGISTRATIONS_CODES.ERROR_REGISTRATION_ALREADY_CANCELLED
+        );
       }
 
       // Update registration status
       registration.status = 'cancelled';
       await registration.save({ session });
 
-      // Decrement registeredCount
-      const event = await Event.findById(registration.eventId).session(session);
-      if (event) {
-        event.registeredCount = Math.max(0, event.registeredCount - 1);
-        await event.save({ session });
-      }
+      // Decrement registeredCount (use updateOne to avoid full document validation)
+      await Event.findByIdAndUpdate(
+        registration.eventId,
+        { $inc: { registeredCount: -1 } },
+        { session }
+      );
 
       // Commit transaction
       await session.commitTransaction();
@@ -471,19 +915,22 @@ class RegistrationsService {
     limit?: number
   ): Promise<PaginatedResponse<RegistrationResponse>> {
     if (!mongoose.Types.ObjectId.isValid(eventId)) {
-      throw new NotFoundError('Invalid event ID');
+      throw new NotFoundError('Invalid event ID', EVENTS_CODES.ERROR_EVENTS_INVALID_ID);
     }
 
     // Find event and verify ownership
     const event = await Event.findById(eventId);
 
     if (!event) {
-      throw new NotFoundError('Event not found');
+      throw new NotFoundError('Event not found', EVENTS_CODES.ERROR_EVENTS_NOT_FOUND);
     }
 
     // Check if user is the organizer
     if (event.organizerId.toString() !== userId) {
-      throw new ForbiddenError('You are not authorized to view registrations for this event');
+      throw new ForbiddenError(
+        'You are not authorized to view registrations for this event',
+        REGISTRATIONS_CODES.ERROR_REGISTRATION_FORBIDDEN
+      );
     }
 
     const { page: parsedPage, limit: parsedLimit, skip } = getPaginationParams(page, limit);
@@ -516,7 +963,7 @@ class RegistrationsService {
 
     const event = await Event.findById(resolvedEventId);
     if (!event) {
-      throw new NotFoundError('Event not found');
+      throw new NotFoundError('Event not found', EVENTS_CODES.ERROR_EVENTS_NOT_FOUND);
     }
 
     const participants = await Registration.find({
@@ -554,7 +1001,10 @@ class RegistrationsService {
     try {
       const registration = await Registration.findById(payment.registrationId).session(session);
       if (!registration) {
-        throw new NotFoundError('Registration not found for payment');
+        throw new NotFoundError(
+          'Registration not found for payment',
+          REGISTRATIONS_CODES.ERROR_REGISTRATION_NOT_FOUND
+        );
       }
 
       registration.paymentStatus = 'completed';
@@ -603,7 +1053,10 @@ class RegistrationsService {
     try {
       const registration = await Registration.findById(payment.registrationId).session(session);
       if (!registration) {
-        throw new NotFoundError('Registration not found for payment');
+        throw new NotFoundError(
+          'Registration not found for payment',
+          REGISTRATIONS_CODES.ERROR_REGISTRATION_NOT_FOUND
+        );
       }
 
       registration.paymentStatus = 'failed';
@@ -647,7 +1100,11 @@ class RegistrationsService {
       }
 
       if (!registration.paymentId) {
-        throw new AppError('Registration has no payment', 400);
+        throw new AppError(
+          'Registration has no payment',
+          400,
+          REGISTRATIONS_CODES.ERROR_REGISTRATION_NO_PAYMENT
+        );
       }
 
       // Refund payment
@@ -725,20 +1182,34 @@ class RegistrationsService {
   }> {
     const registration = await Registration.findById(registrationId);
     if (!registration) {
-      throw new NotFoundError('Registration not found');
+      throw new NotFoundError(
+        'Registration not found',
+        REGISTRATIONS_CODES.ERROR_REGISTRATION_NOT_FOUND
+      );
     }
 
     if (!registration.paymentId) {
-      throw new AppError('Registration has no payment', 400);
+      throw new AppError(
+        'Registration has no payment',
+        400,
+        REGISTRATIONS_CODES.ERROR_REGISTRATION_NO_PAYMENT
+      );
     }
 
     const payment = await Payment.findById(registration.paymentId);
     if (!payment) {
-      throw new NotFoundError('Payment not found');
+      throw new NotFoundError(
+        'Payment not found',
+        REGISTRATIONS_CODES.ERROR_REGISTRATION_NOT_FOUND
+      );
     }
 
     if (!payment.plataMonoInvoiceId) {
-      throw new AppError('Payment has no invoice ID', 400);
+      throw new AppError(
+        'Payment has no invoice ID',
+        400,
+        REGISTRATIONS_CODES.ERROR_REGISTRATION_NO_PAYMENT
+      );
     }
 
     // If already completed, no need to sync
@@ -754,7 +1225,11 @@ class RegistrationsService {
     // Check status from Monobank API
     const statusData = await paymentsService.checkPaymentStatus(payment._id.toString());
     if (!statusData) {
-      throw new AppError('Failed to get payment status from Monobank', 502);
+      throw new AppError(
+        'Failed to get payment status from Monobank',
+        502,
+        REGISTRATIONS_CODES.ERROR_REGISTRATION_NO_PAYMENT
+      );
     }
 
     const monobankStatus = statusData.status as string | undefined;
@@ -818,7 +1293,7 @@ class RegistrationsService {
     if (eventConfig.singleEventId && mongoose.Types.ObjectId.isValid(eventConfig.singleEventId)) {
       return eventConfig.singleEventId;
     }
-    throw new NotFoundError('Invalid event ID');
+    throw new NotFoundError('Invalid event ID', EVENTS_CODES.ERROR_EVENTS_INVALID_ID);
   }
 
   /**

@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { Request, Response } from 'express';
-import { frontendConfig, paymentConfig } from '../config/env';
+import { eventConfig, frontendConfig, paymentConfig } from '../config/env';
 import { logger } from '../config/logger';
 import { Event } from '../models/Event';
 import emailService from '../services/email.service';
@@ -143,16 +143,34 @@ export const handlePlataWebhook = async (req: Request, res: Response): Promise<v
     const event = await Event.findById(registration.eventId).lean();
 
     if (isSuccess && registration.email && event) {
-      void emailService.sendRegistrationConfirmation({
+      // Calculate price breakdown for email
+      const eventBasePrice = event.basePrice ?? eventConfig.basePrice;
+      const registrationFinalPrice = registration.finalPrice ?? payment.amount;
+      const discountAmount =
+        eventBasePrice && registrationFinalPrice < eventBasePrice
+          ? eventBasePrice - registrationFinalPrice
+          : 0;
+
+      const emailParams: Parameters<typeof emailService.sendRegistrationConfirmation>[0] = {
         to: registration.email,
         name: `${registration.name ?? ''} ${registration.surname ?? ''}`.trim() || 'Participant',
         eventTitle: event.title,
         eventDate: event.date.toISOString(),
         eventLocation: event.location,
-        paymentAmount: payment.amount,
+        paymentAmount: registrationFinalPrice,
         paymentCurrency: payment.currency,
         registrationId: registration.id,
-      });
+        basePrice: eventBasePrice,
+      };
+
+      if (discountAmount > 0) {
+        emailParams.discountAmount = discountAmount;
+      }
+      if (registration.promoCode) {
+        emailParams.promoCode = registration.promoCode;
+      }
+
+      void emailService.sendRegistrationConfirmation(emailParams);
     } else if (!isSuccess && registration.email && event) {
       const retryLink = `${frontendConfig.failureUrl}?registrationId=${registration.id}`;
       void emailService.sendPaymentFailed({
