@@ -3,6 +3,7 @@ import { eventConfig, paymentConfig } from '../config/env';
 import { Event } from '../models/Event';
 import { IPayment, Payment } from '../models/Payment';
 import { Registration } from '../models/Registration';
+import { EVENTS_CODES, REGISTRATIONS_CODES } from '../types/codes';
 import { AppError, ConflictError, ForbiddenError, NotFoundError } from '../types/errors';
 import {
   PaginatedResponse,
@@ -100,7 +101,7 @@ class RegistrationsService {
     const { eventId } = input;
 
     if (!mongoose.Types.ObjectId.isValid(eventId)) {
-      throw new NotFoundError('Invalid event ID');
+      throw new NotFoundError('Invalid event ID', EVENTS_CODES.ERROR_EVENTS_INVALID_ID);
     }
 
     // Start a session for transaction
@@ -112,12 +113,15 @@ class RegistrationsService {
       const event = await Event.findById(eventId).session(session);
 
       if (!event) {
-        throw new NotFoundError('Event not found');
+        throw new NotFoundError('Event not found', EVENTS_CODES.ERROR_EVENTS_NOT_FOUND);
       }
 
       // Check if event date is in the future
       if (event.date <= new Date()) {
-        throw new ConflictError('Cannot register for past events');
+        throw new ConflictError(
+          'Cannot register for past events',
+          REGISTRATIONS_CODES.ERROR_REGISTRATION_EVENT_PAST
+        );
       }
 
       // Check if user is already registered
@@ -127,12 +131,18 @@ class RegistrationsService {
       }).session(session);
 
       if (existingRegistration) {
-        throw new ConflictError('You are already registered for this event');
+        throw new ConflictError(
+          'You are already registered for this event',
+          REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_USER
+        );
       }
 
       // Check capacity
       if (!event.hasAvailableCapacity()) {
-        throw new ConflictError('Event has reached full capacity');
+        throw new ConflictError(
+          'Event has reached full capacity',
+          REGISTRATIONS_CODES.ERROR_REGISTRATION_EVENT_FULL
+        );
       }
 
       // Create registration
@@ -191,9 +201,15 @@ class RegistrationsService {
         // Check if it's a registration duplicate (eventId + email or eventId + userId)
         if (keys.includes('eventId') && (keys.includes('email') || keys.includes('userId'))) {
           if (keys.includes('email')) {
-            throw new ConflictError('This email is already registered for this event');
+            throw new ConflictError(
+              'This email is already registered for this event',
+              REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_EMAIL
+            );
           } else if (keys.includes('userId')) {
-            throw new ConflictError('You are already registered for this event');
+            throw new ConflictError(
+              'You are already registered for this event',
+              REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_USER
+            );
           }
         }
       }
@@ -220,11 +236,11 @@ class RegistrationsService {
     try {
       const event = await Event.findById(resolvedEventId).session(session);
       if (!event) {
-        throw new NotFoundError('Event not found');
+        throw new NotFoundError('Event not found', EVENTS_CODES.ERROR_EVENTS_NOT_FOUND);
       }
 
       if (!event.hasAvailableCapacity()) {
-        throw new ConflictError('Event is full');
+        throw new ConflictError('Event is full', REGISTRATIONS_CODES.ERROR_REGISTRATION_EVENT_FULL);
       }
 
       // Check if registration already exists for this email and event
@@ -236,7 +252,10 @@ class RegistrationsService {
       if (existing) {
         // If registration exists and payment is completed/confirmed, throw error
         if (existing.status === 'confirmed' || existing.paymentStatus === 'completed') {
-          throw new ConflictError('This email is already registered for the event');
+          throw new ConflictError(
+            'This email is already registered for the event',
+            REGISTRATIONS_CODES.ERROR_REGISTRATION_DUPLICATE_EMAIL
+          );
         }
 
         // If registration exists with pending payment, return existing payment link
@@ -283,7 +302,10 @@ class RegistrationsService {
 
       const basePrice = event.basePrice ?? eventConfig.basePrice;
       if (basePrice === undefined) {
-        throw new ConflictError('Event price is not configured');
+        throw new ConflictError(
+          'Event price is not configured',
+          REGISTRATIONS_CODES.ERROR_REGISTRATION_PRICE_NOT_CONFIGURED
+        );
       }
 
       const { finalPrice } = calculatePrice(basePrice, validatedPromo);
@@ -391,7 +413,10 @@ class RegistrationsService {
    */
   async cancelRegistration(id: string, userId: string): Promise<void> {
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new NotFoundError('Invalid registration ID');
+      throw new NotFoundError(
+        'Invalid registration ID',
+        REGISTRATIONS_CODES.ERROR_REGISTRATION_INVALID_ID
+      );
     }
 
     // Start a session for transaction
@@ -403,17 +428,26 @@ class RegistrationsService {
       const registration = await Registration.findById(id).session(session);
 
       if (!registration) {
-        throw new NotFoundError('Registration not found');
+        throw new NotFoundError(
+          'Registration not found',
+          REGISTRATIONS_CODES.ERROR_REGISTRATION_NOT_FOUND
+        );
       }
 
       // Check ownership
       if (!registration.userId || registration.userId.toString() !== userId) {
-        throw new ForbiddenError('You are not authorized to cancel this registration');
+        throw new ForbiddenError(
+          'You are not authorized to cancel this registration',
+          REGISTRATIONS_CODES.ERROR_REGISTRATION_FORBIDDEN
+        );
       }
 
       // Check if already cancelled
       if (registration.status === 'cancelled') {
-        throw new ConflictError('Registration is already cancelled');
+        throw new ConflictError(
+          'Registration is already cancelled',
+          REGISTRATIONS_CODES.ERROR_REGISTRATION_ALREADY_CANCELLED
+        );
       }
 
       // Update registration status
@@ -525,19 +559,22 @@ class RegistrationsService {
     limit?: number
   ): Promise<PaginatedResponse<RegistrationResponse>> {
     if (!mongoose.Types.ObjectId.isValid(eventId)) {
-      throw new NotFoundError('Invalid event ID');
+      throw new NotFoundError('Invalid event ID', EVENTS_CODES.ERROR_EVENTS_INVALID_ID);
     }
 
     // Find event and verify ownership
     const event = await Event.findById(eventId);
 
     if (!event) {
-      throw new NotFoundError('Event not found');
+      throw new NotFoundError('Event not found', EVENTS_CODES.ERROR_EVENTS_NOT_FOUND);
     }
 
     // Check if user is the organizer
     if (event.organizerId.toString() !== userId) {
-      throw new ForbiddenError('You are not authorized to view registrations for this event');
+      throw new ForbiddenError(
+        'You are not authorized to view registrations for this event',
+        REGISTRATIONS_CODES.ERROR_REGISTRATION_FORBIDDEN
+      );
     }
 
     const { page: parsedPage, limit: parsedLimit, skip } = getPaginationParams(page, limit);
@@ -570,7 +607,7 @@ class RegistrationsService {
 
     const event = await Event.findById(resolvedEventId);
     if (!event) {
-      throw new NotFoundError('Event not found');
+      throw new NotFoundError('Event not found', EVENTS_CODES.ERROR_EVENTS_NOT_FOUND);
     }
 
     const participants = await Registration.find({
@@ -608,7 +645,10 @@ class RegistrationsService {
     try {
       const registration = await Registration.findById(payment.registrationId).session(session);
       if (!registration) {
-        throw new NotFoundError('Registration not found for payment');
+        throw new NotFoundError(
+          'Registration not found for payment',
+          REGISTRATIONS_CODES.ERROR_REGISTRATION_NOT_FOUND
+        );
       }
 
       registration.paymentStatus = 'completed';
@@ -657,7 +697,10 @@ class RegistrationsService {
     try {
       const registration = await Registration.findById(payment.registrationId).session(session);
       if (!registration) {
-        throw new NotFoundError('Registration not found for payment');
+        throw new NotFoundError(
+          'Registration not found for payment',
+          REGISTRATIONS_CODES.ERROR_REGISTRATION_NOT_FOUND
+        );
       }
 
       registration.paymentStatus = 'failed';
@@ -701,7 +744,11 @@ class RegistrationsService {
       }
 
       if (!registration.paymentId) {
-        throw new AppError('Registration has no payment', 400);
+        throw new AppError(
+          'Registration has no payment',
+          400,
+          REGISTRATIONS_CODES.ERROR_REGISTRATION_NO_PAYMENT
+        );
       }
 
       // Refund payment
@@ -779,20 +826,34 @@ class RegistrationsService {
   }> {
     const registration = await Registration.findById(registrationId);
     if (!registration) {
-      throw new NotFoundError('Registration not found');
+      throw new NotFoundError(
+        'Registration not found',
+        REGISTRATIONS_CODES.ERROR_REGISTRATION_NOT_FOUND
+      );
     }
 
     if (!registration.paymentId) {
-      throw new AppError('Registration has no payment', 400);
+      throw new AppError(
+        'Registration has no payment',
+        400,
+        REGISTRATIONS_CODES.ERROR_REGISTRATION_NO_PAYMENT
+      );
     }
 
     const payment = await Payment.findById(registration.paymentId);
     if (!payment) {
-      throw new NotFoundError('Payment not found');
+      throw new NotFoundError(
+        'Payment not found',
+        REGISTRATIONS_CODES.ERROR_REGISTRATION_NOT_FOUND
+      );
     }
 
     if (!payment.plataMonoInvoiceId) {
-      throw new AppError('Payment has no invoice ID', 400);
+      throw new AppError(
+        'Payment has no invoice ID',
+        400,
+        REGISTRATIONS_CODES.ERROR_REGISTRATION_NO_PAYMENT
+      );
     }
 
     // If already completed, no need to sync
@@ -808,7 +869,11 @@ class RegistrationsService {
     // Check status from Monobank API
     const statusData = await paymentsService.checkPaymentStatus(payment._id.toString());
     if (!statusData) {
-      throw new AppError('Failed to get payment status from Monobank', 502);
+      throw new AppError(
+        'Failed to get payment status from Monobank',
+        502,
+        REGISTRATIONS_CODES.ERROR_REGISTRATION_NO_PAYMENT
+      );
     }
 
     const monobankStatus = statusData.status as string | undefined;
@@ -872,7 +937,7 @@ class RegistrationsService {
     if (eventConfig.singleEventId && mongoose.Types.ObjectId.isValid(eventConfig.singleEventId)) {
       return eventConfig.singleEventId;
     }
-    throw new NotFoundError('Invalid event ID');
+    throw new NotFoundError('Invalid event ID', EVENTS_CODES.ERROR_EVENTS_INVALID_ID);
   }
 
   /**

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import registrationsService from '../services/registrations.service';
+import { REGISTRATIONS_CODES } from '../types/codes';
 
 /**
  * Get all registrations with filters and pagination
@@ -25,6 +26,7 @@ export const getRegistrations = async (req: AuthRequest, res: Response): Promise
 
   res.status(200).json({
     success: true,
+    code: REGISTRATIONS_CODES.SUCCESS_REGISTRATIONS_LIST_RETRIEVED,
     data: result.data,
     pagination: result.pagination,
   });
@@ -46,6 +48,7 @@ export const getMyRegistrations = async (req: AuthRequest, res: Response): Promi
 
   res.status(200).json({
     success: true,
+    code: REGISTRATIONS_CODES.SUCCESS_REGISTRATIONS_LIST_RETRIEVED,
     data: result.data,
     pagination: result.pagination,
   });
@@ -77,6 +80,7 @@ export const getEventRegistrations = async (req: AuthRequest, res: Response): Pr
 
   res.status(200).json({
     success: true,
+    code: REGISTRATIONS_CODES.SUCCESS_REGISTRATIONS_LIST_RETRIEVED,
     data: result.data,
     pagination: result.pagination,
   });
@@ -91,6 +95,7 @@ export const createPublicRegistration = async (req: Request, res: Response): Pro
 
   res.status(201).json({
     success: true,
+    code: REGISTRATIONS_CODES.SUCCESS_REGISTRATION_CREATED,
     data: registration.registration,
     paymentLink: registration.paymentLink,
   });
@@ -110,6 +115,7 @@ export const createRegistration = async (req: AuthRequest, res: Response): Promi
 
   res.status(201).json({
     success: true,
+    code: REGISTRATIONS_CODES.SUCCESS_REGISTRATION_CREATED,
     data: registration,
   });
 };
@@ -125,6 +131,7 @@ export const cancelRegistration = async (req: AuthRequest, res: Response): Promi
   if (!id) {
     res.status(400).json({
       success: false,
+      code: REGISTRATIONS_CODES.ERROR_REGISTRATION_INVALID_ID,
       message: 'Registration ID is required',
     });
     return;
@@ -132,7 +139,10 @@ export const cancelRegistration = async (req: AuthRequest, res: Response): Promi
 
   await registrationsService.cancelRegistration(id, userId);
 
-  res.status(204).send();
+  res.status(200).json({
+    success: true,
+    code: REGISTRATIONS_CODES.SUCCESS_REGISTRATION_CANCELLED,
+  });
 };
 
 /**
@@ -145,6 +155,7 @@ export const getPublicParticipants = async (req: Request, res: Response): Promis
   if (!eventId) {
     res.status(400).json({
       success: false,
+      code: REGISTRATIONS_CODES.ERROR_REGISTRATION_INVALID_ID,
       message: 'Event ID is required',
     });
     return;
@@ -154,6 +165,7 @@ export const getPublicParticipants = async (req: Request, res: Response): Promis
 
   res.status(200).json({
     success: true,
+    code: REGISTRATIONS_CODES.SUCCESS_REGISTRATION_PARTICIPANTS_RETRIEVED,
     data: participants,
   });
 };
@@ -169,6 +181,7 @@ export const processRefund = async (req: AuthRequest, res: Response): Promise<vo
   if (!id) {
     res.status(400).json({
       success: false,
+      code: REGISTRATIONS_CODES.ERROR_REGISTRATION_INVALID_ID,
       message: 'Registration ID is required',
     });
     return;
@@ -178,8 +191,8 @@ export const processRefund = async (req: AuthRequest, res: Response): Promise<vo
 
   res.status(200).json({
     success: true,
+    code: REGISTRATIONS_CODES.SUCCESS_REGISTRATION_REFUNDED,
     data: registration,
-    message: 'Refund processed successfully',
   });
 };
 
@@ -194,6 +207,7 @@ export const getPaymentLink = async (req: Request, res: Response): Promise<void>
   if (!email || !eventId) {
     res.status(400).json({
       success: false,
+      code: REGISTRATIONS_CODES.ERROR_REGISTRATION_INVALID_ID,
       message: 'Email and eventId are required',
     });
     return;
@@ -207,6 +221,7 @@ export const getPaymentLink = async (req: Request, res: Response): Promise<void>
   if (!result) {
     res.status(404).json({
       success: false,
+      code: REGISTRATIONS_CODES.ERROR_REGISTRATION_PAYMENT_LINK_NOT_FOUND,
       message: 'No pending registration found for this email and event',
     });
     return;
@@ -214,6 +229,7 @@ export const getPaymentLink = async (req: Request, res: Response): Promise<void>
 
   res.status(200).json({
     success: true,
+    code: REGISTRATIONS_CODES.SUCCESS_REGISTRATION_PAYMENT_LINK_RETRIEVED,
     data: result.registration,
     paymentLink: result.paymentLink,
   });
@@ -230,6 +246,7 @@ export const syncPaymentStatus = async (req: Request, res: Response): Promise<vo
   if (!id) {
     res.status(400).json({
       success: false,
+      code: REGISTRATIONS_CODES.ERROR_REGISTRATION_INVALID_ID,
       message: 'Registration ID is required',
     });
     return;
@@ -240,14 +257,13 @@ export const syncPaymentStatus = async (req: Request, res: Response): Promise<vo
 
     res.status(200).json({
       success: true,
+      code: REGISTRATIONS_CODES.SUCCESS_REGISTRATION_PAYMENT_SYNCED,
       data: result,
-      message: result.statusChanged
-        ? 'Payment status synchronized successfully'
-        : 'Payment status is already up to date',
     });
   } catch (error) {
     res.status(500).json({
       success: false,
+      code: REGISTRATIONS_CODES.ERROR_REGISTRATION_NO_PAYMENT,
       message: error instanceof Error ? error.message : 'Failed to sync payment status',
     });
   }
