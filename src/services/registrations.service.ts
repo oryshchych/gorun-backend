@@ -138,8 +138,10 @@ class RegistrationsService {
         );
       }
 
-      // Check capacity
-      if (!event.hasAvailableCapacity()) {
+      // Check capacity (skip for single event configured in env)
+      const isSingleEvent =
+        eventConfig.singleEventId && event._id.toString() === eventConfig.singleEventId;
+      if (!isSingleEvent && !event.hasAvailableCapacity()) {
         throw new ConflictError(
           'Event has reached full capacity',
           REGISTRATIONS_CODES.ERROR_REGISTRATION_EVENT_FULL
@@ -261,7 +263,10 @@ class RegistrationsService {
         throw new NotFoundError('Event not found', EVENTS_CODES.ERROR_EVENTS_NOT_FOUND);
       }
 
-      if (!event.hasAvailableCapacity()) {
+      // Check capacity (skip for single event configured in env)
+      const isSingleEvent =
+        eventConfig.singleEventId && event._id.toString() === eventConfig.singleEventId;
+      if (!isSingleEvent && !event.hasAvailableCapacity()) {
         throw new ConflictError('Event is full', REGISTRATIONS_CODES.ERROR_REGISTRATION_EVENT_FULL);
       }
 
