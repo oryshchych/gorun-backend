@@ -10,192 +10,166 @@ import type { AuthResponse, LoginInput, RegisterInput, UserResponse } from './au
 
 export type { AuthResponse, LoginInput, RegisterInput, UserResponse } from './auth.types';
 
-class AuthService {
-  /**
-   * Register a new user
-   * Creates user, hashes password, generates tokens, and stores refresh token
-   */
-  async register(input: RegisterInput): Promise<AuthResponse> {
-    // Check if user already exists
-    const existingUser = await User.findOne({ email: input.email.toLowerCase() });
-    if (existingUser) {
-      throw new ConflictError('User with this email already exists');
-    }
+function formatUserResponse(user: IUser): UserResponse {
+  return {
+    id: user._id.toString(),
+    name: user.name,
+    email: user.email,
+    image: user.image,
+    provider: user.provider,
+    providerId: user.providerId,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
+}
 
-    // Create user (password will be hashed by pre-save hook)
-    // Use new + save to ensure providerId field is truly omitted (not null)
-    const user = new User({
-      name: input.name,
-      email: input.email.toLowerCase(),
-      password: input.password,
-      provider: 'credentials',
-      // providerId is intentionally omitted for credentials provider
-    });
-    // Ensure providerId is not set (pre-save hook will handle $unset)
-    await user.save();
-
-    // Generate tokens
-    const accessToken = generateAccessToken(user._id.toString());
-    const refreshToken = generateRefreshToken(user._id.toString());
-
-    // Store refresh token in database
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
-
-    await RefreshToken.create({
-      userId: user._id,
-      token: refreshToken,
-      expiresAt,
-    });
-
-    // Convert user to response format
-    const userResponse = this.formatUserResponse(user);
-
-    return {
-      user: userResponse,
-      accessToken,
-      refreshToken,
-    };
+/**
+ * Register a new user
+ * Creates user, hashes password, generates tokens, and stores refresh token
+ */
+export async function register(input: RegisterInput): Promise<AuthResponse> {
+  const existingUser = await User.findOne({ email: input.email.toLowerCase() });
+  if (existingUser) {
+    throw new ConflictError('User with this email already exists');
   }
 
-  /**
-   * Login an existing user
-   * Verifies credentials, generates tokens, and stores refresh token
-   */
-  async login(input: LoginInput): Promise<AuthResponse> {
-    // Find user by email
-    const user = await User.findOne({ email: input.email.toLowerCase() });
-    if (!user) {
-      throw new UnauthorizedError('Invalid email or password');
-    }
+  const user = new User({
+    name: input.name,
+    email: input.email.toLowerCase(),
+    password: input.password,
+    provider: 'credentials',
+  });
+  await user.save();
 
-    // Verify password
-    const isPasswordValid = await user.comparePassword(input.password);
-    if (!isPasswordValid) {
-      throw new UnauthorizedError('Invalid email or password');
-    }
+  const accessToken = generateAccessToken(user._id.toString());
+  const refreshToken = generateRefreshToken(user._id.toString());
 
-    // Generate tokens
-    const accessToken = generateAccessToken(user._id.toString());
-    const refreshToken = generateRefreshToken(user._id.toString());
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
 
-    // Store refresh token in database
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
+  await RefreshToken.create({
+    userId: user._id,
+    token: refreshToken,
+    expiresAt,
+  });
 
-    await RefreshToken.create({
-      userId: user._id,
-      token: refreshToken,
-      expiresAt,
-    });
+  return {
+    user: formatUserResponse(user),
+    accessToken,
+    refreshToken,
+  };
+}
 
-    // Convert user to response format
-    const userResponse = this.formatUserResponse(user);
-
-    return {
-      user: userResponse,
-      accessToken,
-      refreshToken,
-    };
+/**
+ * Login an existing user
+ * Verifies credentials, generates tokens, and stores refresh token
+ */
+export async function login(input: LoginInput): Promise<AuthResponse> {
+  const user = await User.findOne({ email: input.email.toLowerCase() });
+  if (!user) {
+    throw new UnauthorizedError('Invalid email or password');
   }
 
-  /**
-   * Refresh access token using refresh token
-   * Verifies refresh token, generates new tokens, and invalidates old token
-   */
-  async refreshAccessToken(refreshTokenString: string): Promise<AuthResponse> {
-    // Verify refresh token
-    let payload;
-    try {
-      payload = verifyRefreshToken(refreshTokenString);
-    } catch (error) {
-      throw new UnauthorizedError('Invalid or expired refresh token');
-    }
+  const isPasswordValid = await user.comparePassword(input.password);
+  if (!isPasswordValid) {
+    throw new UnauthorizedError('Invalid email or password');
+  }
 
-    // Check if refresh token exists in database
-    const storedToken = await RefreshToken.findOne({ token: refreshTokenString });
-    if (!storedToken) {
-      throw new UnauthorizedError('Refresh token not found or has been revoked');
-    }
+  const accessToken = generateAccessToken(user._id.toString());
+  const refreshToken = generateRefreshToken(user._id.toString());
 
-    // Check if token is expired
-    if (storedToken.expiresAt < new Date()) {
-      await RefreshToken.deleteOne({ _id: storedToken._id });
-      throw new UnauthorizedError('Refresh token has expired');
-    }
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
 
-    // Get user
-    const user = await User.findById(payload.userId);
-    if (!user) {
-      throw new NotFoundError('User not found');
-    }
+  await RefreshToken.create({
+    userId: user._id,
+    token: refreshToken,
+    expiresAt,
+  });
 
-    // Generate new tokens
-    const newAccessToken = generateAccessToken(user._id.toString());
-    const newRefreshToken = generateRefreshToken(user._id.toString());
+  return {
+    user: formatUserResponse(user),
+    accessToken,
+    refreshToken,
+  };
+}
 
-    // Invalidate old refresh token and store new one
+/**
+ * Refresh access token using refresh token
+ * Verifies refresh token, generates new tokens, and invalidates old token
+ */
+export async function refreshAccessToken(refreshTokenString: string): Promise<AuthResponse> {
+  let payload;
+  try {
+    payload = verifyRefreshToken(refreshTokenString);
+  } catch (error) {
+    throw new UnauthorizedError('Invalid or expired refresh token');
+  }
+
+  const storedToken = await RefreshToken.findOne({ token: refreshTokenString });
+  if (!storedToken) {
+    throw new UnauthorizedError('Refresh token not found or has been revoked');
+  }
+
+  if (storedToken.expiresAt < new Date()) {
     await RefreshToken.deleteOne({ _id: storedToken._id });
-
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
-
-    await RefreshToken.create({
-      userId: user._id,
-      token: newRefreshToken,
-      expiresAt,
-    });
-
-    // Convert user to response format
-    const userResponse = this.formatUserResponse(user);
-
-    return {
-      user: userResponse,
-      accessToken: newAccessToken,
-      refreshToken: newRefreshToken,
-    };
+    throw new UnauthorizedError('Refresh token has expired');
   }
 
-  /**
-   * Logout user by removing refresh token from database
-   */
-  async logout(refreshTokenString: string): Promise<void> {
-    // Remove refresh token from database
-    const result = await RefreshToken.deleteOne({ token: refreshTokenString });
-
-    if (result.deletedCount === 0) {
-      throw new NotFoundError('Refresh token not found');
-    }
+  const user = await User.findById(payload.userId);
+  if (!user) {
+    throw new NotFoundError('User not found');
   }
 
-  /**
-   * Get current user by ID
-   */
-  async getCurrentUser(userId: string): Promise<UserResponse> {
-    const user = await User.findById(userId);
+  const newAccessToken = generateAccessToken(user._id.toString());
+  const newRefreshToken = generateRefreshToken(user._id.toString());
 
-    if (!user) {
-      throw new NotFoundError('User not found');
-    }
+  await RefreshToken.deleteOne({ _id: storedToken._id });
 
-    return this.formatUserResponse(user);
-  }
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
 
-  /**
-   * Format user document to response format
-   */
-  private formatUserResponse(user: IUser): UserResponse {
-    return {
-      id: user._id.toString(),
-      name: user.name,
-      email: user.email,
-      image: user.image,
-      provider: user.provider,
-      providerId: user.providerId,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    };
+  await RefreshToken.create({
+    userId: user._id,
+    token: newRefreshToken,
+    expiresAt,
+  });
+
+  return {
+    user: formatUserResponse(user),
+    accessToken: newAccessToken,
+    refreshToken: newRefreshToken,
+  };
+}
+
+/**
+ * Logout user by removing refresh token from database
+ */
+export async function logout(refreshTokenString: string): Promise<void> {
+  const result = await RefreshToken.deleteOne({ token: refreshTokenString });
+
+  if (result.deletedCount === 0) {
+    throw new NotFoundError('Refresh token not found');
   }
 }
 
-export default new AuthService();
+/**
+ * Get current user by ID
+ */
+export async function getCurrentUser(userId: string): Promise<UserResponse> {
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new NotFoundError('User not found');
+  }
+
+  return formatUserResponse(user);
+}
+
+export default {
+  register,
+  login,
+  refreshAccessToken,
+  logout,
+  getCurrentUser,
+};
