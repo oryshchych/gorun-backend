@@ -1,35 +1,14 @@
-import { RefreshToken } from '../models/RefreshToken';
-import { IUser, User } from '../models/User';
-import { ConflictError, NotFoundError, UnauthorizedError } from '../types/errors';
-import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwt.util';
+import { RefreshToken } from '../../models/RefreshToken';
+import { IUser, User } from '../../models/User';
+import { ConflictError, NotFoundError, UnauthorizedError } from '../../types/errors';
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  verifyRefreshToken,
+} from '../../utils/jwt.util';
+import type { AuthResponse, LoginInput, RegisterInput, UserResponse } from './auth.types';
 
-export interface RegisterInput {
-  name: string;
-  email: string;
-  password: string;
-}
-
-export interface LoginInput {
-  email: string;
-  password: string;
-}
-
-export interface UserResponse {
-  id: string;
-  name: string;
-  email: string;
-  image?: string | undefined;
-  provider: string;
-  providerId?: string | undefined;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface AuthResponse {
-  user: UserResponse;
-  accessToken: string;
-  refreshToken: string;
-}
+export type { AuthResponse, LoginInput, RegisterInput, UserResponse } from './auth.types';
 
 class AuthService {
   /**

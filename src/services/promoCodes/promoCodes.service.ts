@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
-import { IPromoCode, PromoCode } from '../models/PromoCode';
-import { PROMO_CODES_CODES } from '../types/codes';
-import { NotFoundError, ValidationError } from '../types/errors';
+import { IPromoCode, PromoCode } from '../../models/PromoCode';
+import { PROMO_CODES_CODES } from '../../types/codes';
+import { NotFoundError, ValidationError } from '../../types/errors';
 
 class PromoCodesService {
   /**

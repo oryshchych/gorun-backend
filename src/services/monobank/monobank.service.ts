@@ -1,5 +1,5 @@
-import { paymentConfig } from '../config/env';
-import { logger } from '../config/logger';
+import { paymentConfig } from '../../config/env';
+import { logger } from '../../config/logger';
 
 /**
  * Service for interacting with Monobank API

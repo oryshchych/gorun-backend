@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import authService from '../services/auth.service';
+import authService from '../services/auth/auth.service';
 
 /**
  * Register a new user

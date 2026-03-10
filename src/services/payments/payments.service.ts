@@ -1,24 +1,11 @@
 import mongoose from 'mongoose';
-import { frontendConfig, paymentConfig, serverConfig } from '../config/env';
-import { logger } from '../config/logger';
-import { IPayment, Payment } from '../models/Payment';
-import { PAYMENTS_CODES } from '../types/codes';
-import { AppError } from '../types/errors';
-import monobankService from './monobank.service';
-
-interface CreatePaymentParams {
-  registrationId: string;
-  amount: number;
-  customerName: string;
-  eventTitle: string;
-  session?: mongoose.ClientSession;
-}
-
-interface PlataInvoiceResponse {
-  invoiceId?: string;
-  paymentLink?: string;
-  raw?: unknown;
-}
+import { frontendConfig, paymentConfig, serverConfig } from '../../config/env';
+import { logger } from '../../config/logger';
+import { IPayment, Payment } from '../../models/Payment';
+import { PAYMENTS_CODES } from '../../types/codes';
+import { AppError } from '../../types/errors';
+import monobankService from '../monobank/monobank.service';
+import type { CreatePaymentParams, PlataInvoiceResponse } from './payments.types';
 
 class PaymentsService {
   /**

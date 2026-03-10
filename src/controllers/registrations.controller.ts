@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import registrationsService from '../services/registrations.service';
+import registrationsService from '../services/registrations/registrations.service';
 import { REGISTRATIONS_CODES } from '../types/codes';
 
 /**

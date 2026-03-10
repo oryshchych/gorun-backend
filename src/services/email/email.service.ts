@@ -1,5 +1,6 @@
-import { emailConfig } from '../config/env';
-import { logger } from '../config/logger';
+import { emailConfig } from '../../config/env';
+import { logger } from '../../config/logger';
+import type { SendEmailInput } from './email.types';
 
 /**
  * Format date to Kyiv timezone
@@ -16,12 +17,6 @@ const formatKyivDate = (dateString: string): string => {
     hour12: false,
   });
 };
-
-interface SendEmailInput {
-  to: string;
-  subject: string;
-  html: string;
-}
 
 class EmailService {
   private async sendEmail({ to, subject, html }: SendEmailInput): Promise<void> {

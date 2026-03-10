@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import paymentsService from '../services/payments.service';
+import paymentsService from '../services/payments/payments.service';
 
 /**
  * Check payment status from Monobank API (fallback)

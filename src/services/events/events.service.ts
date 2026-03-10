@@ -1,106 +1,29 @@
 import mongoose from 'mongoose';
-import { eventConfig } from '../config/env';
-import { Event, IEvent, Speaker } from '../models/Event';
-import { Registration } from '../models/Registration';
-import { ConflictError, ForbiddenError, NotFoundError } from '../types/errors';
+import { eventConfig } from '../../config/env';
+import { Event, IEvent, Speaker } from '../../models/Event';
+import { Registration } from '../../models/Registration';
+import { ConflictError, ForbiddenError, NotFoundError } from '../../types/errors';
 import {
   PaginatedResponse,
   formatPaginatedResponse,
   getPaginationParams,
-} from '../utils/pagination.util';
+} from '../../utils/pagination.util';
+import type {
+  CreateEventInput,
+  EventFilters,
+  EventResponse,
+  PopulatedOrganizer,
+  TranslationFields,
+  UpdateEventInput,
+} from './events.types';
 
-export type TranslationFields = {
-  title?: { en?: string; uk?: string };
-  description?: { en?: string; uk?: string };
-  location?: { en?: string; uk?: string };
-  speakers?: Array<{ en?: string; uk?: string }>;
-  date?: { en?: string; uk?: string };
-  partners?: Array<{ en?: string; uk?: string; imageUrl?: string }>;
-};
-export interface CreateEventInput {
-  translations: TranslationFields;
-  title?: string;
-  description?: string;
-  date: Date;
-  location?: string;
-  capacity: number;
-  imageUrl?: {
-    portrait: string;
-    landscape: string;
-  };
-  basePrice?: number;
-  speakers?: Speaker[];
-  gallery?: string[];
-  map?: {
-    latitude?: number;
-    longitude?: number;
-  };
-}
-
-export interface UpdateEventInput {
-  translations?: TranslationFields;
-  title?: string;
-  description?: string;
-  date?: Date;
-  location?: string;
-  capacity?: number;
-  imageUrl?: {
-    portrait: string;
-    landscape: string;
-  };
-  basePrice?: number;
-  speakers?: Speaker[];
-  gallery?: string[];
-  map?: {
-    latitude?: number;
-    longitude?: number;
-  };
-}
-
-export interface EventFilters {
-  search?: string;
-  startDate?: Date;
-  endDate?: Date;
-  location?: string;
-}
-
-interface PopulatedOrganizer {
-  _id: mongoose.Types.ObjectId;
-  name: string;
-  email: string;
-  image?: string;
-}
-
-export interface EventResponse {
-  id: string;
-  translations: TranslationFields;
-  title: string;
-  description: string;
-  date: Date;
-  location: string;
-  capacity: number;
-  registeredCount: number;
-  organizerId?: string;
-  imageUrl?: {
-    portrait: string;
-    landscape: string;
-  };
-  basePrice?: number;
-  speakers?: Speaker[];
-  gallery?: string[];
-  map?: {
-    latitude?: number;
-    longitude?: number;
-  };
-  createdAt: Date;
-  updatedAt: Date;
-  organizer?: PopulatedOrganizer;
-  resolvedTitle?: string;
-  resolvedDescription?: string;
-  resolvedLocation?: string;
-  resolvedSpeakers?: string[];
-  resolvedDate?: string;
-}
+export type {
+  CreateEventInput,
+  EventFilters,
+  EventResponse,
+  TranslationFields,
+  UpdateEventInput,
+} from './events.types';
 
 class EventsService {
   /**

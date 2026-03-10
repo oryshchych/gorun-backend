@@ -1,93 +1,37 @@
 import mongoose from 'mongoose';
-import { eventConfig, paymentConfig } from '../config/env';
-import { Event } from '../models/Event';
-import { IPayment, Payment } from '../models/Payment';
-import { Registration } from '../models/Registration';
-import { EVENTS_CODES, REGISTRATIONS_CODES } from '../types/codes';
-import { AppError, ConflictError, ForbiddenError, NotFoundError } from '../types/errors';
+import { eventConfig, paymentConfig } from '../../config/env';
+import { Event } from '../../models/Event';
+import { IPayment, Payment } from '../../models/Payment';
+import { Registration } from '../../models/Registration';
+import { EVENTS_CODES, REGISTRATIONS_CODES } from '../../types/codes';
+import { AppError, ConflictError, ForbiddenError, NotFoundError } from '../../types/errors';
 import {
   PaginatedResponse,
   formatPaginatedResponse,
   getPaginationParams,
-} from '../utils/pagination.util';
-import { calculatePrice } from '../utils/pricing.util';
-import emailService from './email.service';
-import monobankService from './monobank.service';
-import paymentsService from './payments.service';
-import promoCodesService from './promoCodes.service';
+} from '../../utils/pagination.util';
+import { calculatePrice } from '../../utils/pricing.util';
+import emailService from '../email/email.service';
+import monobankService from '../monobank/monobank.service';
+import paymentsService from '../payments/payments.service';
+import promoCodesService from '../promoCodes/promoCodes.service';
+import type {
+  CreatePublicRegistrationInput,
+  CreateRegistrationInput,
+  PopulatedEvent,
+  PopulatedUser,
+  PublicParticipant,
+  RegistrationFilters,
+  RegistrationResponse,
+} from './registrations.types';
 
-export interface CreateRegistrationInput {
-  eventId: string;
-}
-
-export interface CreatePublicRegistrationInput {
-  eventId: string;
-  name: string;
-  surname: string;
-  email: string;
-  city: string;
-  runningClub?: string;
-  phone?: string;
-  promoCode?: string;
-}
-
-export interface RegistrationFilters {
-  eventId?: string;
-  status?: 'pending' | 'confirmed' | 'cancelled';
-}
-
-interface PopulatedUser {
-  _id: mongoose.Types.ObjectId;
-  name: string;
-  email: string;
-  image?: string;
-}
-
-interface PopulatedEvent {
-  _id: mongoose.Types.ObjectId;
-  title: string;
-  description: string;
-  date: Date;
-  location: string;
-  capacity: number;
-  registeredCount: number;
-  organizerId: mongoose.Types.ObjectId;
-  imageUrl?: {
-    portrait: string;
-    landscape: string;
-  };
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface RegistrationResponse {
-  id: string;
-  eventId: string;
-  userId?: string;
-  status: 'pending' | 'confirmed' | 'cancelled';
-  registeredAt: Date;
-  name?: string;
-  surname?: string;
-  email?: string;
-  city?: string;
-  runningClub?: string;
-  phone?: string;
-  promoCode?: string;
-  paymentStatus?: 'pending' | 'completed' | 'failed';
-  paymentId?: string;
-  finalPrice?: number;
-  event?: PopulatedEvent;
-  user?: PopulatedUser;
-}
-
-export interface PublicParticipant {
-  id: string;
-  name?: string;
-  surname?: string;
-  city?: string;
-  runningClub?: string;
-  registeredAt: Date;
-}
+export type {
+  CreatePublicRegistrationInput,
+  CreateRegistrationInput,
+  PublicParticipant,
+  RegistrationFilters,
+  RegistrationResponse,
+} from './registrations.types';
 
 class RegistrationsService {
   /**

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import eventsService, { UpdateEventInput } from '../services/events.service';
+import eventsService, { UpdateEventInput } from '../services/events/events.service';
 
 const getRequestedLang = (req: Request): 'en' | 'uk' | undefined => {
   const queryLang = (req.query.lang as string | undefined)?.toLowerCase();
