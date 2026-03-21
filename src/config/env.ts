@@ -12,7 +12,29 @@ const envSchema = z.object({
   JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
   JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
   JWT_ACCESS_EXPIRY: z.string().default('15m'),
+  /** Short-lived refresh (login without remember-me, default rotation) */
   JWT_REFRESH_EXPIRY: z.string().default('7d'),
+  /** Long-lived refresh when rememberMe / OAuth remember_me */
+  JWT_REFRESH_EXPIRY_LONG: z.string().default('30d'),
+  /** Password reset link TTL (e.g. 1h) */
+  PASSWORD_RESET_TOKEN_EXPIRY: z.string().default('1h'),
+  /** One-time OAuth exchange code TTL (seconds) */
+  OAUTH_EXCHANGE_CODE_TTL_SEC: z
+    .string()
+    .default('60')
+    .transform(Number)
+    .pipe(z.number().positive()),
+  /** OAuth CSRF state document TTL (minutes) */
+  OAUTH_STATE_TTL_MIN: z.string().default('10').transform(Number).pipe(z.number().positive()),
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  /** Backend callback URL registered in Google Cloud (e.g. http://localhost:5000/api/auth/google/callback) */
+  GOOGLE_OAUTH_REDIRECT_URI: z.string().optional(),
+  /**
+   * Comma-separated allowed origins for ?redirect_uri= on GET /auth/google (must match start of redirect URL).
+   * Defaults to FRONTEND_URL origin only.
+   */
+  FRONTEND_OAUTH_REDIRECT_ORIGINS: z.string().optional(),
   CORS_ORIGIN: z
     .string()
     .default('http://localhost:3000')
@@ -78,7 +100,43 @@ export const jwtConfig = {
   refreshSecret: config.JWT_REFRESH_SECRET,
   accessExpiry: config.JWT_ACCESS_EXPIRY,
   refreshExpiry: config.JWT_REFRESH_EXPIRY,
+  refreshExpiryLong: config.JWT_REFRESH_EXPIRY_LONG,
 };
+
+export const authFlowConfig = {
+  passwordResetTokenExpiry: config.PASSWORD_RESET_TOKEN_EXPIRY,
+  oauthExchangeCodeTtlSec: config.OAUTH_EXCHANGE_CODE_TTL_SEC,
+  oauthStateTtlMin: config.OAUTH_STATE_TTL_MIN,
+};
+
+export const googleOAuthConfig = {
+  clientId: config.GOOGLE_CLIENT_ID ?? '',
+  clientSecret: config.GOOGLE_CLIENT_SECRET ?? '',
+  redirectUri: config.GOOGLE_OAUTH_REDIRECT_URI ?? '',
+};
+
+/** Allowed origins for OAuth front redirect (after callback) */
+export function getFrontendOAuthRedirectOrigins(): string[] {
+  const extra = config.FRONTEND_OAUTH_REDIRECT_ORIGINS;
+  if (extra && extra.trim()) {
+    return extra
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+      .map(o => {
+        try {
+          return new URL(o).origin;
+        } catch {
+          return o;
+        }
+      });
+  }
+  try {
+    return [new URL(config.FRONTEND_URL).origin];
+  } catch {
+    return [];
+  }
+}
 
 export const corsConfig = {
   origin: new Set(config.CORS_ORIGIN.split(',').map(o => o.trim())),
