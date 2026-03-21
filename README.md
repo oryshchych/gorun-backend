@@ -77,7 +77,7 @@ Before running this project, ensure you have the following installed:
    cp .env.example .env
    ```
 
-   Edit `.env` file with your configuration (see Environment Variables section below)
+   Edit `.env` file with your configuration (see Environment Variables section below). For Google login, follow [docs/GOOGLE_OAUTH.md](docs/GOOGLE_OAUTH.md).
 
 4. **Ensure MongoDB is running**
    ```bash
@@ -146,6 +146,10 @@ http://localhost:5000/api-docs
 ```
 
 The Swagger UI provides detailed information about all endpoints, request/response schemas, and allows you to test the API directly from the browser.
+
+### Google Sign-In (Google Cloud)
+
+Step-by-step checklist (OAuth consent screen, credentials, `.env`, smoke test): **[docs/GOOGLE_OAUTH.md](docs/GOOGLE_OAUTH.md)**.
 
 ## API Endpoints Summary
 
