@@ -4,6 +4,9 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface IUser extends Document {
   _id: mongoose.Types.ObjectId;
   name: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
   email: string;
   password: string;
   image?: string;
@@ -20,8 +23,25 @@ const userSchema = new Schema<IUser>(
       type: String,
       required: [true, 'Name is required'],
       minlength: [2, 'Name must be at least 2 characters'],
-      maxlength: [50, 'Name must not exceed 50 characters'],
+      maxlength: [100, 'Name must not exceed 100 characters'],
       trim: true,
+    },
+    firstName: {
+      type: String,
+      maxlength: [50, 'First name must not exceed 50 characters'],
+      trim: true,
+    },
+    lastName: {
+      type: String,
+      maxlength: [50, 'Last name must not exceed 50 characters'],
+      trim: true,
+    },
+    phone: {
+      type: String,
+      trim: true,
+      sparse: true,
+      unique: true,
+      match: [/^\+[1-9]\d{6,14}$/, 'Phone must be in E.164 format'],
     },
     email: {
       type: String,
@@ -117,6 +137,17 @@ userSchema.pre('save', async function (next) {
   } catch (error) {
     next(error as Error);
   }
+});
+
+// Derive display name from first + last when both set
+userSchema.pre('save', function (next) {
+  if (this.firstName && this.lastName) {
+    const combined = `${this.firstName} ${this.lastName}`.trim();
+    if (combined.length >= 2) {
+      this.name = combined;
+    }
+  }
+  next();
 });
 
 export const User = mongoose.model<IUser>('User', userSchema);
