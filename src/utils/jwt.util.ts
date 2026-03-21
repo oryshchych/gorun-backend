@@ -16,12 +16,15 @@ export const generateAccessToken = (userId: string): string => {
 };
 
 /**
- * Generate a refresh token with 7 day expiry
+ * Generate a refresh token (default expiry from config, or explicit JWT expiresIn string)
  */
-export const generateRefreshToken = (userId: string): string => {
+export const generateRefreshToken = (
+  userId: string,
+  expiresIn: string = jwtConfig.refreshExpiry
+): string => {
   const payload: JWTPayload = { userId };
   return jwt.sign(payload, jwtConfig.refreshSecret, {
-    expiresIn: jwtConfig.refreshExpiry as string | number,
+    expiresIn: expiresIn as string | number,
   } as jwt.SignOptions);
 };
 
