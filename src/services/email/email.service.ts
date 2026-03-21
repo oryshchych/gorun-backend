@@ -226,9 +226,38 @@ export async function sendPaymentLink(params: {
   });
 }
 
+export async function sendPasswordResetEmail(params: {
+  to: string;
+  resetLink: string;
+  locale: string;
+}): Promise<void> {
+  const { to, resetLink, locale } = params;
+  const isUk = locale.toLowerCase().startsWith('uk');
+
+  const subject = isUk ? 'Скидання пароля GoRun' : 'GoRun password reset';
+  const html = isUk
+    ? `
+      <h1>Скидання пароля</h1>
+      <p>Натисніть посилання нижче, щоб встановити новий пароль. Воно дійсне обмежений час.</p>
+      <p><a href="${resetLink}">Скинути пароль</a></p>
+      <p style="word-break: break-all; color: #666;">${resetLink}</p>
+      <p>Якщо ви не запитували скидання, проігноруйте цей лист.</p>
+    `
+    : `
+      <h1>Password reset</h1>
+      <p>Use the link below to set a new password. It expires after a short time.</p>
+      <p><a href="${resetLink}">Reset password</a></p>
+      <p style="word-break: break-all; color: #666;">${resetLink}</p>
+      <p>If you did not request a reset, you can ignore this email.</p>
+    `;
+
+  await sendEmail({ to, subject, html });
+}
+
 export default {
   sendRegistrationConfirmation,
   sendPaymentFailed,
   sendErrorNotification,
   sendPaymentLink,
+  sendPasswordResetEmail,
 };
