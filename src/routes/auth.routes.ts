@@ -1,34 +1,37 @@
 import { Router } from 'express';
-import { register, login, refresh, logout, me } from '../controllers/auth.controller';
+import {
+  forgotPasswordHandler,
+  googleCallback,
+  googleStart,
+  login,
+  logout,
+  me,
+  oauthExchange,
+  refresh,
+  register,
+  resetPasswordHandler,
+} from '../controllers/auth.controller';
 import { authenticate } from '../middleware/auth.middleware';
-import { validate, ValidationType } from '../middleware/validation.middleware';
-import { registerSchema, loginSchema, refreshTokenSchema } from '../validators/auth.validator';
+import { ValidationType, validate } from '../middleware/validation.middleware';
 import { asyncHandler } from '../utils/asyncHandler';
+import {
+  forgotPasswordSchema,
+  googleOAuthStartQuerySchema,
+  loginSchema,
+  oauthExchangeSchema,
+  refreshTokenSchema,
+  registerSchema,
+  resetPasswordSchema,
+} from '../validators/auth.validator';
 
 const router = Router();
 
-/**
- * POST /api/auth/register
- * Register a new user
- */
 router.post('/register', validate(registerSchema, ValidationType.BODY), asyncHandler(register));
 
-/**
- * POST /api/auth/login
- * Login an existing user
- */
 router.post('/login', validate(loginSchema, ValidationType.BODY), asyncHandler(login));
 
-/**
- * POST /api/auth/refresh
- * Refresh access token
- */
 router.post('/refresh', validate(refreshTokenSchema, ValidationType.BODY), asyncHandler(refresh));
 
-/**
- * POST /api/auth/logout
- * Logout user (requires authentication)
- */
 router.post(
   '/logout',
   authenticate,
@@ -36,10 +39,32 @@ router.post(
   asyncHandler(logout)
 );
 
-/**
- * GET /api/auth/me
- * Get current user profile (requires authentication)
- */
 router.get('/me', authenticate, asyncHandler(me));
+
+router.get(
+  '/google',
+  validate(googleOAuthStartQuerySchema, ValidationType.QUERY),
+  asyncHandler(googleStart)
+);
+
+router.get('/google/callback', asyncHandler(googleCallback));
+
+router.post(
+  '/oauth/exchange',
+  validate(oauthExchangeSchema, ValidationType.BODY),
+  asyncHandler(oauthExchange)
+);
+
+router.post(
+  '/forgot-password',
+  validate(forgotPasswordSchema, ValidationType.BODY),
+  asyncHandler(forgotPasswordHandler)
+);
+
+router.post(
+  '/reset-password',
+  validate(resetPasswordSchema, ValidationType.BODY),
+  asyncHandler(resetPasswordHandler)
+);
 
 export default router;
