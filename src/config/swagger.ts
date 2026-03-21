@@ -39,8 +39,23 @@ const options: swaggerJsdoc.Options = {
             },
             name: {
               type: 'string',
-              description: 'User full name',
+              description: 'User full name (derived or legacy)',
               example: 'John Doe',
+            },
+            firstName: {
+              type: 'string',
+              description: 'Given name',
+              example: 'John',
+            },
+            lastName: {
+              type: 'string',
+              description: 'Family name',
+              example: 'Doe',
+            },
+            phone: {
+              type: 'string',
+              description: 'E.164 phone when set',
+              example: '+380501234567',
             },
             email: {
               type: 'string',
@@ -60,6 +75,10 @@ const options: swaggerJsdoc.Options = {
               description: 'Authentication provider',
               example: 'credentials',
             },
+            providerId: {
+              type: 'string',
+              description: 'OAuth subject id when provider is google',
+            },
             createdAt: {
               type: 'string',
               format: 'date-time',
@@ -74,13 +93,32 @@ const options: swaggerJsdoc.Options = {
         },
         RegisterInput: {
           type: 'object',
-          required: ['name', 'email', 'password'],
+          required: ['email', 'password'],
+          description:
+            'Preferred: firstName, lastName, phone (E.164), email, password. Legacy: name (min 2 chars), email, password; optional phone.',
           properties: {
+            firstName: {
+              type: 'string',
+              minLength: 1,
+              maxLength: 50,
+              example: 'John',
+            },
+            lastName: {
+              type: 'string',
+              minLength: 1,
+              maxLength: 50,
+              example: 'Doe',
+            },
+            phone: {
+              type: 'string',
+              description: 'E.164, e.g. +380501234567',
+              example: '+380501234567',
+            },
             name: {
               type: 'string',
               minLength: 2,
               maxLength: 50,
-              description: 'User full name',
+              description: 'Deprecated: full name; use firstName + lastName + phone',
               example: 'John Doe',
             },
             email: {
@@ -113,23 +151,62 @@ const options: swaggerJsdoc.Options = {
               description: 'User password',
               example: 'SecurePass123!',
             },
+            rememberMe: {
+              type: 'boolean',
+              default: false,
+              description:
+                'If true, refresh token TTL uses JWT_REFRESH_EXPIRY_LONG (default 30d); if false, JWT_REFRESH_EXPIRY (default 7d). Access token TTL unchanged.',
+            },
           },
         },
         AuthResponse: {
           type: 'object',
+          description:
+            'Wrapped in API as { success, data: { user, accessToken, refreshToken } }. Refresh JWT exp matches DB session (short vs long).',
           properties: {
             user: {
               $ref: '#/components/schemas/User',
             },
             accessToken: {
               type: 'string',
-              description: 'JWT access token (expires in 15 minutes)',
+              description: `JWT access token (exp: ${config.JWT_ACCESS_EXPIRY} by default)`,
               example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
             },
             refreshToken: {
               type: 'string',
-              description: 'JWT refresh token (expires in 7 days)',
+              description: `JWT refresh token — ${config.JWT_REFRESH_EXPIRY} without remember-me / OAuth remember_me=false; ${config.JWT_REFRESH_EXPIRY_LONG} with remember-me / remember_me=true`,
               example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+            },
+          },
+        },
+        ForgotPasswordInput: {
+          type: 'object',
+          required: ['email'],
+          properties: {
+            email: { type: 'string', format: 'email' },
+            locale: {
+              type: 'string',
+              description: 'BCP-47-ish locale for email template (e.g. uk, en)',
+              example: 'uk',
+            },
+          },
+        },
+        ResetPasswordInput: {
+          type: 'object',
+          required: ['token', 'password', 'confirmPassword'],
+          properties: {
+            token: { type: 'string', description: 'Opaque token from reset email' },
+            password: { type: 'string', minLength: 8, maxLength: 100 },
+            confirmPassword: { type: 'string' },
+          },
+        },
+        OAuthExchangeInput: {
+          type: 'object',
+          required: ['code'],
+          properties: {
+            code: {
+              type: 'string',
+              description: 'One-time code from frontend callback query (short TTL, default 60s)',
             },
           },
         },
@@ -781,7 +858,8 @@ const options: swaggerJsdoc.Options = {
         post: {
           tags: ['Authentication'],
           summary: 'Register a new user',
-          description: 'Create a new user account with email and password',
+          description:
+            'Create account. Prefer firstName, lastName, phone (E.164), email, password. Legacy: name + email + password.',
           requestBody: {
             required: true,
             content: {
@@ -840,7 +918,8 @@ const options: swaggerJsdoc.Options = {
         post: {
           tags: ['Authentication'],
           summary: 'Login user',
-          description: 'Authenticate user with email and password',
+          description:
+            'Authenticate with email and password. Optional rememberMe controls refresh JWT TTL (see JWT_REFRESH_EXPIRY vs JWT_REFRESH_EXPIRY_LONG).',
           requestBody: {
             required: true,
             content: {
@@ -982,7 +1061,8 @@ const options: swaggerJsdoc.Options = {
         get: {
           tags: ['Authentication'],
           summary: 'Get current user',
-          description: 'Get the profile of the currently authenticated user',
+          description:
+            'Get the profile of the currently authenticated user (id, email, firstName, lastName, phone, image, provider, …)',
           security: [
             {
               bearerAuth: [],
@@ -994,7 +1074,11 @@ const options: swaggerJsdoc.Options = {
               content: {
                 'application/json': {
                   schema: {
-                    $ref: '#/components/schemas/User',
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      data: { $ref: '#/components/schemas/User' },
+                    },
                   },
                 },
               },
@@ -1008,6 +1092,167 @@ const options: swaggerJsdoc.Options = {
                   },
                 },
               },
+            },
+          },
+        },
+      },
+      '/api/auth/google': {
+        get: {
+          tags: ['Authentication'],
+          summary: 'Start Google OAuth',
+          description:
+            '302 redirect to Google. Query redirect_uri must be whitelisted (FRONTEND_OAUTH_REDIRECT_ORIGINS + FRONTEND_URL). Google Console redirect_uri must be backend GOOGLE_OAUTH_REDIRECT_URI only (e.g. …/api/auth/google/callback).',
+          parameters: [
+            {
+              name: 'redirect_uri',
+              in: 'query',
+              required: true,
+              schema: { type: 'string', format: 'uri' },
+              description: 'Frontend URL to return to with ?code= one-time exchange code',
+            },
+            {
+              name: 'locale',
+              in: 'query',
+              required: false,
+              schema: { type: 'string' },
+            },
+            {
+              name: 'remember_me',
+              in: 'query',
+              required: false,
+              schema: { type: 'string', enum: ['true', 'false', '1', '0'] },
+              description:
+                'Maps to long-lived refresh token after exchange (same as login rememberMe)',
+            },
+          ],
+          responses: {
+            302: { description: 'Redirect to accounts.google.com' },
+            400: {
+              description: 'Invalid redirect_uri or validation error',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            503: { description: 'Google OAuth not configured' },
+          },
+        },
+      },
+      '/api/auth/google/callback': {
+        get: {
+          tags: ['Authentication'],
+          summary: 'Google OAuth callback',
+          description:
+            'Handled by Google redirect; do not call from frontend directly. 302 to frontend with code or oauth_error.',
+          parameters: [
+            { name: 'code', in: 'query', schema: { type: 'string' } },
+            { name: 'state', in: 'query', schema: { type: 'string' } },
+            { name: 'error', in: 'query', schema: { type: 'string' } },
+          ],
+          responses: {
+            302: {
+              description: 'Redirect to frontend redirect_uri or FRONTEND_URL with query params',
+            },
+          },
+        },
+      },
+      '/api/auth/oauth/exchange': {
+        post: {
+          tags: ['Authentication'],
+          summary: 'Exchange OAuth one-time code for JWT',
+          description:
+            'Same response shape as POST /api/auth/login (user + accessToken + refreshToken). Code is single-use.',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/OAuthExchangeInput' },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: 'Tokens issued',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean' },
+                      data: { $ref: '#/components/schemas/AuthResponse' },
+                    },
+                  },
+                },
+              },
+            },
+            400: {
+              description: 'Invalid or expired code',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+          },
+        },
+      },
+      '/api/auth/forgot-password': {
+        post: {
+          tags: ['Authentication'],
+          summary: 'Request password reset',
+          description:
+            'Always returns 200 with the same message (no email enumeration). Email sent if user exists (Resend configured).',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ForgotPasswordInput' },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: 'Generic success',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      message: { type: 'string' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      '/api/auth/reset-password': {
+        post: {
+          tags: ['Authentication'],
+          summary: 'Reset password with token',
+          description:
+            'Invalidates all refresh sessions for the user on success. Token TTL from PASSWORD_RESET_TOKEN_EXPIRY (default 1h).',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ResetPasswordInput' },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: 'Password updated',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean' },
+                      message: { type: 'string' },
+                    },
+                  },
+                },
+              },
+            },
+            400: {
+              description: 'Validation or invalid token',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
             },
           },
         },
