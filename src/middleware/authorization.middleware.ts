@@ -1,7 +1,7 @@
-import { Response, NextFunction } from 'express';
-import { AuthRequest } from './auth.middleware';
+import { NextFunction, Response } from 'express';
 import { Event } from '../models/Event';
 import { ForbiddenError, NotFoundError } from '../types/errors';
+import { AuthRequest } from './auth.middleware';
 
 /**
  * Middleware to verify user is the event organizer
@@ -14,7 +14,7 @@ export const isEventOrganizer = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const eventId = req.params.id;
+    const eventId = (req.validatedParams as { id?: string } | undefined)?.id ?? req.params.id;
     const userId = req.user?.userId;
 
     if (!userId) {

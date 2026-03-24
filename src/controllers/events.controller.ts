@@ -1,8 +1,15 @@
 import { Request, Response } from 'express';
+import type { z } from 'zod';
 import { AuthRequest } from '../middleware/auth.middleware';
 import eventsService, { UpdateEventInput } from '../services/events/events.service';
+import { getEventsQuerySchema } from '../validators/events.validator';
+
+type GetEventsQuery = z.infer<typeof getEventsQuerySchema>;
 
 const getRequestedLang = (req: Request): 'en' | 'uk' | undefined => {
+  const fromQ = req.validatedQuery as { lang?: 'en' | 'uk' } | undefined;
+  if (fromQ?.lang === 'en' || fromQ?.lang === 'uk') return fromQ.lang;
+
   const queryLang = (req.query.lang as string | undefined)?.toLowerCase();
   if (queryLang === 'en' || queryLang === 'uk') return queryLang;
   const headerLang = req.headers['accept-language'];
@@ -32,7 +39,8 @@ export const getSingleEvent = async (_req: Request, res: Response): Promise<void
  * GET /api/events
  */
 export const getEvents = async (req: Request, res: Response): Promise<void> => {
-  const { search, startDate, endDate, location, page, limit } = req.query;
+  const q = req.validatedQuery as GetEventsQuery;
+  const { search, startDate, endDate, location, page, limit } = q;
   const lang = getRequestedLang(req);
 
   // Build filters object, only including defined values
@@ -42,17 +50,12 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
     endDate?: Date;
     location?: string;
   } = {};
-  if (search) filters.search = search as string;
-  if (startDate) filters.startDate = new Date(startDate as string);
-  if (endDate) filters.endDate = new Date(endDate as string);
-  if (location) filters.location = location as string;
+  if (search) filters.search = search;
+  if (startDate) filters.startDate = startDate;
+  if (endDate) filters.endDate = endDate;
+  if (location) filters.location = location;
 
-  const result = await eventsService.getEvents(
-    filters,
-    page ? Number(page) : undefined,
-    limit ? Number(limit) : undefined,
-    lang
-  );
+  const result = await eventsService.getEvents(filters, page, limit, lang);
 
   res.status(200).json({
     success: true,
@@ -66,7 +69,7 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
  * GET /api/events/:id
  */
 export const getEventById = async (req: Request, res: Response): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.validatedParams as { id: string };
   const lang = getRequestedLang(req);
 
   if (!id) {
@@ -128,7 +131,7 @@ export const createEvent = async (req: AuthRequest, res: Response): Promise<void
  * PUT /api/events/:id
  */
 export const updateEvent = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.validatedParams as { id: string };
   const userId = req.user!.userId;
   const {
     translations,
@@ -176,7 +179,7 @@ export const updateEvent = async (req: AuthRequest, res: Response): Promise<void
  * DELETE /api/events/:id
  */
 export const deleteEvent = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.validatedParams as { id: string };
   const userId = req.user!.userId;
 
   if (!id) {
@@ -198,13 +201,9 @@ export const deleteEvent = async (req: AuthRequest, res: Response): Promise<void
  */
 export const getMyEvents = async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user!.userId;
-  const { page, limit } = req.query;
+  const { page, limit } = req.validatedQuery as GetEventsQuery;
 
-  const result = await eventsService.getMyEvents(
-    userId,
-    page ? Number(page) : undefined,
-    limit ? Number(limit) : undefined
-  );
+  const result = await eventsService.getMyEvents(userId, page, limit);
 
   res.status(200).json({
     success: true,
@@ -218,7 +217,7 @@ export const getMyEvents = async (req: AuthRequest, res: Response): Promise<void
  * GET /api/events/:id/check-registration
  */
 export const checkRegistration = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.validatedParams as { id: string };
   const userId = req.user!.userId;
 
   if (!id) {

@@ -7,7 +7,7 @@ import paymentsService from '../services/payments/payments.service';
  * GET /api/payments/:id/status
  */
 export const checkPaymentStatus = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.validatedParams as { id: string };
 
   if (!id) {
     res.status(400).json({
@@ -38,7 +38,7 @@ export const checkPaymentStatus = async (req: AuthRequest, res: Response): Promi
  * GET /api/payments/:id/receipt
  */
 export const getPaymentReceipt = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.validatedParams as { id: string };
 
   if (!id) {
     res.status(400).json({

@@ -13,7 +13,16 @@ export function validate(schema: z.ZodSchema, type: ValidationType = ValidationT
     try {
       const dataToValidate = req[type];
       const validated = await schema.parseAsync(dataToValidate);
-      req[type] = validated;
+
+      // Express 5: req.query / req.params are getters — assigning throws TypeError.
+      if (type === ValidationType.QUERY) {
+        req.validatedQuery = validated;
+      } else if (type === ValidationType.PARAMS) {
+        req.validatedParams = validated;
+      } else {
+        req.body = validated;
+      }
+
       next();
     } catch (error) {
       if (error instanceof ZodError) {

@@ -100,7 +100,7 @@ export const me = async (req: AuthRequest, res: Response): Promise<void> => {
  * GET /api/auth/google
  */
 export const googleStart = async (req: Request, res: Response): Promise<void> => {
-  const q = req.query as {
+  const q = req.validatedQuery as {
     redirect_uri: string;
     locale?: string;
     remember_me?: 'true' | 'false' | '1' | '0';
