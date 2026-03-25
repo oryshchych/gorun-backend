@@ -159,7 +159,8 @@ Step-by-step checklist (OAuth consent screen, credentials, `.env`, smoke test): 
 - `POST /api/auth/login` - Login; optional `rememberMe` (refresh TTL)
 - `POST /api/auth/refresh` - Refresh access token
 - `POST /api/auth/logout` - Logout and invalidate refresh token
-- `GET /api/auth/me` - Current user profile (protected)
+- `GET /api/auth/me` - Current user profile (protected, full fields incl. dateOfBirth, gender, …)
+- `PATCH /api/auth/me` - Partial profile update; `null` clears a field; email not patchable (protected)
 - `GET /api/auth/google` - Start Google OAuth (`redirect_uri`, optional `locale`, `remember_me`)
 - `GET /api/auth/google/callback` - Google redirect (configure in Google Cloud)
 - `POST /api/auth/oauth/exchange` - Exchange one-time OAuth `code` for JWT pair

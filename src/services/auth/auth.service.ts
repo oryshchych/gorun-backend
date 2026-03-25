@@ -13,10 +13,12 @@ import { generateAccessToken, verifyRefreshToken } from '../../utils/jwt.util';
 import { expiryToDate } from '../../utils/time.util';
 import emailService from '../email/email.service';
 import { randomUrlSafeToken, sha256Hex } from './auth.crypto';
+import type { UpdateProfileInput } from '../../validators/auth.validator';
 import { formatUserResponse, issueRefreshTokenJwt, persistRefreshToken } from './auth.helpers';
 import type { AuthResponse, LoginInput, RegisterInput, UserResponse } from './auth.types';
 
 export type { AuthResponse, LoginInput, RegisterInput, UserResponse } from './auth.types';
+export type { UpdateProfileInput } from '../../validators/auth.validator';
 
 function buildLegacyNameParts(name: string): { firstName: string; lastName: string } {
   const trimmed = name.trim();
@@ -173,6 +175,62 @@ export async function getCurrentUser(userId: string): Promise<UserResponse> {
 }
 
 /**
+ * Partial profile update. Omit keys to leave unchanged; null clears a field.
+ * email is not patchable (rejected by schema .strict() if sent).
+ */
+export async function updateProfile(
+  userId: string,
+  patch: UpdateProfileInput
+): Promise<UserResponse> {
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new NotFoundError('User not found');
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return formatUserResponse(user);
+  }
+
+  if ('phone' in patch) {
+    if (patch.phone === null) {
+      user.set('phone', undefined);
+    } else if (patch.phone !== undefined) {
+      const newPhone = patch.phone;
+      const existing = await User.findOne({ phone: newPhone, _id: { $ne: user._id } });
+      if (existing) {
+        throw new ConflictError('User with this phone number already exists');
+      }
+      user.phone = newPhone;
+    }
+  }
+
+  const assignKeys = [
+    'firstName',
+    'lastName',
+    'dateOfBirth',
+    'gender',
+    'emergencyContactName',
+    'emergencyContactPhone',
+    'runningClub',
+    'city',
+    'deliveryAddress',
+  ] as const;
+
+  for (const key of assignKeys) {
+    if (!(key in patch)) continue;
+    const val = patch[key];
+    if (val === null) {
+      user.set(key, undefined);
+    } else if (val !== undefined) {
+      (user as unknown as Record<string, unknown>)[key] = val;
+    }
+  }
+
+  await user.save();
+  return formatUserResponse(user);
+}
+
+/**
  * Request password reset (always appears successful to avoid email enumeration).
  */
 export async function forgotPassword(email: string, locale?: string): Promise<void> {
@@ -245,6 +303,7 @@ export default {
   refreshAccessToken,
   logout,
   getCurrentUser,
+  updateProfile,
   forgotPassword,
   resetPassword,
 };

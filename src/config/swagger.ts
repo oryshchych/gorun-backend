@@ -31,6 +31,8 @@ const options: swaggerJsdoc.Options = {
         // User schemas
         User: {
           type: 'object',
+          description:
+            'Stable keys; optional profile fields are null when unset. firstName/lastName may be derived from name until set explicitly.',
           properties: {
             id: {
               type: 'string',
@@ -44,27 +46,55 @@ const options: swaggerJsdoc.Options = {
             },
             firstName: {
               type: 'string',
+              nullable: true,
               description: 'Given name',
               example: 'John',
             },
             lastName: {
               type: 'string',
+              nullable: true,
               description: 'Family name',
               example: 'Doe',
             },
             phone: {
               type: 'string',
-              description: 'E.164 phone when set',
+              nullable: true,
+              description: 'E.164 when set',
               example: '+380501234567',
             },
             email: {
               type: 'string',
               format: 'email',
-              description: 'User email address',
+              description: 'User email (read-only in profile PATCH)',
               example: 'john.doe@example.com',
+            },
+            dateOfBirth: {
+              type: 'string',
+              nullable: true,
+              description: 'YYYY-MM-DD',
+              example: '1990-05-15',
+            },
+            gender: {
+              type: 'string',
+              nullable: true,
+              enum: ['female', 'male', 'other', 'prefer_not_to_say'],
+            },
+            emergencyContactName: { type: 'string', nullable: true },
+            emergencyContactPhone: {
+              type: 'string',
+              nullable: true,
+              description: 'E.164 when set',
+            },
+            runningClub: { type: 'string', nullable: true },
+            city: { type: 'string', nullable: true },
+            deliveryAddress: {
+              type: 'string',
+              nullable: true,
+              description: 'Free text, max 2000 chars',
             },
             image: {
               type: 'string',
+              nullable: true,
               format: 'uri',
               description: 'User profile image URL',
               example: 'https://example.com/avatar.jpg',
@@ -77,6 +107,7 @@ const options: swaggerJsdoc.Options = {
             },
             providerId: {
               type: 'string',
+              nullable: true,
               description: 'OAuth subject id when provider is google',
             },
             createdAt: {
@@ -91,6 +122,28 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        UpdateProfileInput: {
+          type: 'object',
+          description:
+            'Partial profile. Omit a property to leave it unchanged; set to null to clear. email/id are not allowed (extra keys rejected). dateOfBirth: valid YYYY-MM-DD, not in the future, age 18+.',
+          additionalProperties: false,
+          properties: {
+            firstName: { type: 'string', nullable: true, maxLength: 100 },
+            lastName: { type: 'string', nullable: true, maxLength: 100 },
+            phone: { type: 'string', nullable: true, description: 'E.164' },
+            dateOfBirth: { type: 'string', nullable: true, example: '1990-05-15' },
+            gender: {
+              type: 'string',
+              nullable: true,
+              enum: ['female', 'male', 'other', 'prefer_not_to_say'],
+            },
+            emergencyContactName: { type: 'string', nullable: true, maxLength: 200 },
+            emergencyContactPhone: { type: 'string', nullable: true },
+            runningClub: { type: 'string', nullable: true, maxLength: 200 },
+            city: { type: 'string', nullable: true, maxLength: 100 },
+            deliveryAddress: { type: 'string', nullable: true, maxLength: 2000 },
+          },
+        },
         RegisterInput: {
           type: 'object',
           required: ['email', 'password'],
@@ -100,13 +153,13 @@ const options: swaggerJsdoc.Options = {
             firstName: {
               type: 'string',
               minLength: 1,
-              maxLength: 50,
+              maxLength: 100,
               example: 'John',
             },
             lastName: {
               type: 'string',
               minLength: 1,
-              maxLength: 50,
+              maxLength: 100,
               example: 'Doe',
             },
             phone: {
@@ -117,7 +170,7 @@ const options: swaggerJsdoc.Options = {
             name: {
               type: 'string',
               minLength: 2,
-              maxLength: 50,
+              maxLength: 100,
               description: 'Deprecated: full name; use firstName + lastName + phone',
               example: 'John Doe',
             },
@@ -1062,7 +1115,7 @@ const options: swaggerJsdoc.Options = {
           tags: ['Authentication'],
           summary: 'Get current user',
           description:
-            'Get the profile of the currently authenticated user (id, email, firstName, lastName, phone, image, provider, …)',
+            'Full profile: stable field names; unset optional fields are null. email is read-only in UI.',
           security: [
             {
               bearerAuth: [],
@@ -1085,6 +1138,73 @@ const options: swaggerJsdoc.Options = {
             },
             401: {
               description: 'Unauthorized',
+              content: {
+                'application/json': {
+                  schema: {
+                    $ref: '#/components/schemas/Error',
+                  },
+                },
+              },
+            },
+          },
+        },
+        patch: {
+          tags: ['Authentication'],
+          summary: 'Update current user profile',
+          description:
+            'Partial PATCH: omit keys to keep values; null clears a field. Cannot change email or id. Returns full User (same as GET /me).',
+          security: [
+            {
+              bearerAuth: [],
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  $ref: '#/components/schemas/UpdateProfileInput',
+                },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: 'Updated profile',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      data: { $ref: '#/components/schemas/User' },
+                    },
+                  },
+                },
+              },
+            },
+            400: {
+              description: 'Validation error',
+              content: {
+                'application/json': {
+                  schema: {
+                    $ref: '#/components/schemas/Error',
+                  },
+                },
+              },
+            },
+            401: {
+              description: 'Unauthorized',
+              content: {
+                'application/json': {
+                  schema: {
+                    $ref: '#/components/schemas/Error',
+                  },
+                },
+              },
+            },
+            409: {
+              description: 'Phone already in use',
               content: {
                 'application/json': {
                   schema: {

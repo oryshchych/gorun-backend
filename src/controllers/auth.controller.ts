@@ -8,6 +8,7 @@ import {
 } from '../services/auth/auth.oauth.service';
 import authService from '../services/auth/auth.service';
 import type { RegisterInput } from '../services/auth/auth.types';
+import type { UpdateProfileInput } from '../validators/auth.validator';
 
 function queryString(v: unknown): string | undefined {
   if (typeof v === 'string') return v;
@@ -88,6 +89,22 @@ export const me = async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user!.userId;
 
   const user = await authService.getCurrentUser(userId);
+
+  res.status(200).json({
+    success: true,
+    data: user,
+  });
+};
+
+/**
+ * Update current user profile (partial; null clears a field). Email cannot be changed here.
+ * PATCH /api/auth/me
+ */
+export const patchMe = async (req: AuthRequest, res: Response): Promise<void> => {
+  const userId = req.user!.userId;
+  const body = req.body as UpdateProfileInput;
+
+  const user = await authService.updateProfile(userId, body);
 
   res.status(200).json({
     success: true,

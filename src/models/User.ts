@@ -1,6 +1,9 @@
 import bcrypt from 'bcrypt';
 import mongoose, { Document, Schema } from 'mongoose';
 
+export const USER_GENDER_VALUES = ['female', 'male', 'other', 'prefer_not_to_say'] as const;
+export type UserGender = (typeof USER_GENDER_VALUES)[number];
+
 export interface IUser extends Document {
   _id: mongoose.Types.ObjectId;
   name: string;
@@ -12,6 +15,14 @@ export interface IUser extends Document {
   image?: string;
   provider: 'credentials' | 'google';
   providerId?: string;
+  /** ISO date-only YYYY-MM-DD */
+  dateOfBirth?: string;
+  gender?: UserGender;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  runningClub?: string;
+  city?: string;
+  deliveryAddress?: string;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(password: string): Promise<boolean>;
@@ -28,12 +39,12 @@ const userSchema = new Schema<IUser>(
     },
     firstName: {
       type: String,
-      maxlength: [50, 'First name must not exceed 50 characters'],
+      maxlength: [100, 'First name must not exceed 100 characters'],
       trim: true,
     },
     lastName: {
       type: String,
-      maxlength: [50, 'Last name must not exceed 50 characters'],
+      maxlength: [100, 'Last name must not exceed 100 characters'],
       trim: true,
     },
     phone: {
@@ -68,6 +79,40 @@ const userSchema = new Schema<IUser>(
     providerId: {
       type: String,
       // No default - field is omitted when not provided
+    },
+    dateOfBirth: {
+      type: String,
+      trim: true,
+      match: [/^\d{4}-\d{2}-\d{2}$/, 'dateOfBirth must be YYYY-MM-DD'],
+    },
+    gender: {
+      type: String,
+      enum: USER_GENDER_VALUES,
+    },
+    emergencyContactName: {
+      type: String,
+      maxlength: [200, 'Emergency contact name must not exceed 200 characters'],
+      trim: true,
+    },
+    emergencyContactPhone: {
+      type: String,
+      trim: true,
+      match: [/^\+[1-9]\d{6,14}$/, 'Emergency phone must be in E.164 format'],
+    },
+    runningClub: {
+      type: String,
+      maxlength: [200, 'Running club must not exceed 200 characters'],
+      trim: true,
+    },
+    city: {
+      type: String,
+      maxlength: [100, 'City must not exceed 100 characters'],
+      trim: true,
+    },
+    deliveryAddress: {
+      type: String,
+      maxlength: [2000, 'Delivery address must not exceed 2000 characters'],
+      trim: true,
     },
   },
   {

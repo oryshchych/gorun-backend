@@ -7,6 +7,7 @@ import {
   logout,
   me,
   oauthExchange,
+  patchMe,
   refresh,
   register,
   resetPasswordHandler,
@@ -22,6 +23,7 @@ import {
   refreshTokenSchema,
   registerSchema,
   resetPasswordSchema,
+  updateProfileSchema,
 } from '../validators/auth.validator';
 
 const router = Router();
@@ -40,6 +42,13 @@ router.post(
 );
 
 router.get('/me', authenticate, asyncHandler(me));
+
+router.patch(
+  '/me',
+  authenticate,
+  validate(updateProfileSchema, ValidationType.BODY),
+  asyncHandler(patchMe)
+);
 
 router.get(
   '/google',

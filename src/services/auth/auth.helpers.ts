@@ -1,32 +1,38 @@
 import mongoose from 'mongoose';
 import { jwtConfig } from '../../config/env';
-import { RefreshToken } from '../../models/RefreshToken';
 import { IUser } from '../../models/User';
-import { generateRefreshToken } from '../../utils/jwt.util';
+import { RefreshToken } from '../../models/RefreshToken';
 import { expiryToDate } from '../../utils/time.util';
-import type { UserResponse } from './auth.types';
+import { generateRefreshToken } from '../../utils/jwt.util';
+import type { ProfileGender, UserResponse } from './auth.types';
 
 export function formatUserResponse(user: IUser): UserResponse {
   const parts = (user.name || '').trim().split(/\s+/).filter(Boolean);
-  const derivedFirst = (user.firstName ?? parts[0] ?? '').trim();
-  const derivedLast = (user.lastName ?? (parts.length > 1 ? parts.slice(1).join(' ') : '')).trim();
+  const derivedFirst = (user.firstName?.trim() || parts[0] || '').trim() || null;
+  const derivedLast =
+    (user.lastName?.trim() || (parts.length > 1 ? parts.slice(1).join(' ') : '') || '').trim() ||
+    null;
 
-  const out: UserResponse = {
+  return {
     id: user._id.toString(),
     name: user.name,
+    firstName: derivedFirst,
+    lastName: derivedLast,
+    phone: user.phone ?? null,
     email: user.email,
+    dateOfBirth: user.dateOfBirth ?? null,
+    gender: (user.gender as ProfileGender | undefined) ?? null,
+    emergencyContactName: user.emergencyContactName ?? null,
+    emergencyContactPhone: user.emergencyContactPhone ?? null,
+    runningClub: user.runningClub ?? null,
+    city: user.city ?? null,
+    deliveryAddress: user.deliveryAddress ?? null,
+    image: user.image ?? null,
     provider: user.provider,
+    providerId: user.providerId ?? null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
-
-  if (derivedFirst) out.firstName = derivedFirst;
-  if (derivedLast) out.lastName = derivedLast;
-  if (user.phone) out.phone = user.phone;
-  if (user.image) out.image = user.image;
-  if (user.providerId) out.providerId = user.providerId;
-
-  return out;
 }
 
 export async function persistRefreshToken(
