@@ -3,6 +3,7 @@ import { logger } from '../../config/logger';
 import { PasswordResetToken } from '../../models/PasswordResetToken';
 import { RefreshToken } from '../../models/RefreshToken';
 import { User } from '../../models/User';
+import { AUTH_CODES, VALIDATION_CODES } from '../../types/codes';
 import {
   ConflictError,
   NotFoundError,
@@ -36,7 +37,10 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
 
   const existingEmail = await User.findOne({ email });
   if (existingEmail) {
-    throw new ConflictError('User with this email already exists');
+    throw new ConflictError(
+      'User with this email already exists',
+      AUTH_CODES.ERROR_AUTH_EMAIL_EXISTS
+    );
   }
 
   let firstName: string;
@@ -49,7 +53,10 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
     phone = input.phone.trim();
     const existingPhone = await User.findOne({ phone });
     if (existingPhone) {
-      throw new ConflictError('User with this phone number already exists');
+      throw new ConflictError(
+        'User with this phone number already exists',
+        AUTH_CODES.ERROR_AUTH_PHONE_EXISTS
+      );
     }
   } else if (input.name && input.name.trim().length >= 2) {
     const parts = buildLegacyNameParts(input.name);
@@ -59,13 +66,19 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
     if (phone) {
       const existingPhone = await User.findOne({ phone });
       if (existingPhone) {
-        throw new ConflictError('User with this phone number already exists');
+        throw new ConflictError(
+          'User with this phone number already exists',
+          AUTH_CODES.ERROR_AUTH_PHONE_EXISTS
+        );
       }
     }
   } else {
-    throw new ValidationError({
-      body: ['Provide firstName, lastName, phone or a valid name (legacy)'],
-    });
+    throw new ValidationError(
+      {
+        body: ['Provide firstName, lastName, phone or a valid name (legacy)'],
+      },
+      VALIDATION_CODES.ERROR_VALIDATION_FAILED
+    );
   }
 
   const user = new User({
@@ -96,12 +109,18 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
 export async function login(input: LoginInput): Promise<AuthResponse> {
   const user = await User.findOne({ email: input.email.toLowerCase() });
   if (!user) {
-    throw new UnauthorizedError('Invalid email or password');
+    throw new UnauthorizedError(
+      'Invalid email or password',
+      AUTH_CODES.ERROR_AUTH_INVALID_CREDENTIALS
+    );
   }
 
   const isPasswordValid = await user.comparePassword(input.password);
   if (!isPasswordValid) {
-    throw new UnauthorizedError('Invalid email or password');
+    throw new UnauthorizedError(
+      'Invalid email or password',
+      AUTH_CODES.ERROR_AUTH_INVALID_CREDENTIALS
+    );
   }
 
   const longLived = Boolean(input.rememberMe);
@@ -123,23 +142,29 @@ export async function refreshAccessToken(refreshTokenString: string): Promise<Au
   let payload;
   try {
     payload = verifyRefreshToken(refreshTokenString);
-  } catch (error) {
-    throw new UnauthorizedError('Invalid or expired refresh token');
+  } catch {
+    throw new UnauthorizedError(
+      'Invalid or expired refresh token',
+      AUTH_CODES.ERROR_AUTH_REFRESH_TOKEN_INVALID
+    );
   }
 
   const storedToken = await RefreshToken.findOne({ token: refreshTokenString });
   if (!storedToken) {
-    throw new UnauthorizedError('Refresh token not found or has been revoked');
+    throw new UnauthorizedError(
+      'Refresh token not found or has been revoked',
+      AUTH_CODES.ERROR_AUTH_REFRESH_TOKEN_INVALID
+    );
   }
 
   if (storedToken.expiresAt < new Date()) {
     await RefreshToken.deleteOne({ _id: storedToken._id });
-    throw new UnauthorizedError('Refresh token has expired');
+    throw new UnauthorizedError('Refresh token has expired', AUTH_CODES.ERROR_AUTH_TOKEN_EXPIRED);
   }
 
   const user = await User.findById(payload.userId);
   if (!user) {
-    throw new NotFoundError('User not found');
+    throw new NotFoundError('User not found', AUTH_CODES.ERROR_AUTH_USER_NOT_FOUND);
   }
 
   const longLived = Boolean(storedToken.longLived);
@@ -160,7 +185,7 @@ export async function logout(refreshTokenString: string): Promise<void> {
   const result = await RefreshToken.deleteOne({ token: refreshTokenString });
 
   if (result.deletedCount === 0) {
-    throw new NotFoundError('Refresh token not found');
+    throw new NotFoundError('Refresh token not found', AUTH_CODES.ERROR_AUTH_REFRESH_TOKEN_INVALID);
   }
 }
 
@@ -168,7 +193,7 @@ export async function getCurrentUser(userId: string): Promise<UserResponse> {
   const user = await User.findById(userId);
 
   if (!user) {
-    throw new NotFoundError('User not found');
+    throw new NotFoundError('User not found', AUTH_CODES.ERROR_AUTH_USER_NOT_FOUND);
   }
 
   return formatUserResponse(user);
@@ -184,7 +209,7 @@ export async function updateProfile(
 ): Promise<UserResponse> {
   const user = await User.findById(userId);
   if (!user) {
-    throw new NotFoundError('User not found');
+    throw new NotFoundError('User not found', AUTH_CODES.ERROR_AUTH_USER_NOT_FOUND);
   }
 
   if (Object.keys(patch).length === 0) {
@@ -198,7 +223,10 @@ export async function updateProfile(
       const newPhone = patch.phone;
       const existing = await User.findOne({ phone: newPhone, _id: { $ne: user._id } });
       if (existing) {
-        throw new ConflictError('User with this phone number already exists');
+        throw new ConflictError(
+          'User with this phone number already exists',
+          AUTH_CODES.ERROR_AUTH_PHONE_EXISTS
+        );
       }
       user.phone = newPhone;
     }
@@ -274,20 +302,26 @@ export async function resetPassword(
   confirmPassword: string
 ): Promise<void> {
   if (password !== confirmPassword) {
-    throw new ValidationError({ confirmPassword: ['Passwords do not match'] });
+    throw new ValidationError(
+      { confirmPassword: ['Passwords do not match'] },
+      VALIDATION_CODES.ERROR_VALIDATION_FAILED
+    );
   }
 
   const tokenHash = sha256Hex(token);
   const record = await PasswordResetToken.findOne({ tokenHash });
   if (!record || record.expiresAt < new Date()) {
     if (record) await PasswordResetToken.deleteOne({ _id: record._id });
-    throw new ValidationError({ token: ['Invalid or expired reset token'] });
+    throw new ValidationError(
+      { token: ['Invalid or expired reset token'] },
+      AUTH_CODES.ERROR_AUTH_RESET_TOKEN_INVALID
+    );
   }
 
   const user = await User.findById(record.userId);
   if (!user) {
     await PasswordResetToken.deleteOne({ _id: record._id });
-    throw new NotFoundError('User not found');
+    throw new NotFoundError('User not found', AUTH_CODES.ERROR_AUTH_USER_NOT_FOUND);
   }
 
   user.password = password;
