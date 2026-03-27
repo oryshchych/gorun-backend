@@ -120,6 +120,17 @@ const options: swaggerJsdoc.Options = {
               format: 'date-time',
               description: 'Last update timestamp',
             },
+            isAdmin: {
+              type: 'boolean',
+              description: 'When true, user may access admin UI and admin APIs',
+              example: false,
+            },
+            adminRole: {
+              type: 'string',
+              nullable: true,
+              enum: ['admin', 'super_admin'],
+              description: 'Set only when isAdmin is true; otherwise null',
+            },
           },
         },
         UpdateProfileInput: {
@@ -707,6 +718,56 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        AdminPromoCode: {
+          type: 'object',
+          description:
+            'Admin promo resource; discountType uses fixed (maps to amount in DB). code is uppercase.',
+          properties: {
+            id: { type: 'string', example: '507f1f77bcf86cd799439011' },
+            code: { type: 'string', example: 'EARLY10' },
+            discountType: { type: 'string', enum: ['percentage', 'fixed'] },
+            discountValue: { type: 'number', example: 10 },
+            eventId: { type: 'string', nullable: true },
+            isActive: { type: 'boolean' },
+            usageLimit: { type: 'integer', nullable: true, description: 'null = unlimited' },
+            usedCount: { type: 'integer' },
+            expirationDate: { type: 'string', format: 'date-time', nullable: true },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        AdminPromoCodeCreate: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['code', 'discountType', 'discountValue', 'eventId'],
+          properties: {
+            code: { type: 'string', maxLength: 50 },
+            discountType: { type: 'string', enum: ['percentage', 'fixed'] },
+            discountValue: { type: 'number', minimum: 0 },
+            eventId: { type: 'string', description: 'Mongo ObjectId' },
+            isActive: { type: 'boolean', default: true },
+            usageLimit: { type: 'integer', minimum: 1, nullable: true },
+            expirationDate: {
+              type: 'string',
+              nullable: true,
+              description: 'Parseable date string',
+            },
+          },
+        },
+        AdminPromoCodePatch: {
+          type: 'object',
+          additionalProperties: false,
+          description: 'Partial update; at least one field recommended',
+          properties: {
+            code: { type: 'string', maxLength: 50 },
+            discountType: { type: 'string', enum: ['percentage', 'fixed'] },
+            discountValue: { type: 'number', minimum: 0 },
+            eventId: { type: 'string' },
+            isActive: { type: 'boolean' },
+            usageLimit: { type: 'integer', minimum: 1, nullable: true },
+            expirationDate: { type: 'string', nullable: true },
+          },
+        },
         // Error schemas
         Error: {
           type: 'object',
@@ -881,6 +942,10 @@ const options: swaggerJsdoc.Options = {
       {
         name: 'Promo Codes',
         description: 'Promo code validation endpoints',
+      },
+      {
+        name: 'Admin',
+        description: 'Admin-only endpoints (JWT + isAdmin)',
       },
       {
         name: 'Health',
@@ -2349,6 +2414,221 @@ const options: swaggerJsdoc.Options = {
                   schema: { $ref: '#/components/schemas/Error' },
                 },
               },
+            },
+          },
+        },
+      },
+      '/api/admin/promo-codes': {
+        get: {
+          tags: ['Admin'],
+          summary: 'List promo codes (admin)',
+          description: 'Paginated list with optional filters. Requires admin user.',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'page',
+              in: 'query',
+              schema: { type: 'integer', minimum: 1, default: 1 },
+            },
+            {
+              name: 'limit',
+              in: 'query',
+              schema: { type: 'integer', minimum: 1, maximum: 100, default: 10 },
+            },
+            {
+              name: 'eventId',
+              in: 'query',
+              schema: { type: 'string' },
+              description: 'Filter by event ObjectId',
+            },
+            {
+              name: 'isActive',
+              in: 'query',
+              schema: { type: 'string', enum: ['true', 'false'] },
+            },
+            {
+              name: 'search',
+              in: 'query',
+              schema: { type: 'string', maxLength: 100 },
+              description: 'Case-insensitive substring match on code',
+            },
+          ],
+          responses: {
+            200: {
+              description: 'List retrieved',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      code: {
+                        type: 'string',
+                        example: 'SUCCESS_PROMO_CODES_ADMIN_LIST_RETRIEVED',
+                      },
+                      data: {
+                        type: 'array',
+                        items: { $ref: '#/components/schemas/AdminPromoCode' },
+                      },
+                      pagination: { $ref: '#/components/schemas/Pagination' },
+                    },
+                  },
+                },
+              },
+            },
+            401: {
+              description: 'Unauthorized',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            403: {
+              description: 'Authenticated but not admin',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            422: {
+              description: 'Query validation failed',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+          },
+        },
+        post: {
+          tags: ['Admin'],
+          summary: 'Create promo code (admin)',
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AdminPromoCodeCreate' },
+              },
+            },
+          },
+          responses: {
+            201: {
+              description: 'Created',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      code: { type: 'string', example: 'SUCCESS_PROMO_CODE_ADMIN_CREATED' },
+                      data: { $ref: '#/components/schemas/AdminPromoCode' },
+                    },
+                  },
+                },
+              },
+            },
+            401: {
+              description: 'Unauthorized',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            403: {
+              description: 'Authenticated but not admin',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            404: {
+              description: 'Event not found',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            409: {
+              description: 'Duplicate code',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            422: {
+              description: 'Body validation failed',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+          },
+        },
+      },
+      '/api/admin/promo-codes/{id}': {
+        get: {
+          tags: ['Admin'],
+          summary: 'Get promo code by id (admin)',
+          security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: {
+            200: {
+              description: 'Promo code',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      code: { type: 'string', example: 'SUCCESS_PROMO_CODE_RETRIEVED' },
+                      data: { $ref: '#/components/schemas/AdminPromoCode' },
+                    },
+                  },
+                },
+              },
+            },
+            401: {
+              description: 'Unauthorized',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            403: {
+              description: 'Authenticated but not admin',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            404: {
+              description: 'Promo code not found',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            422: {
+              description: 'Invalid id format',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+          },
+        },
+        patch: {
+          tags: ['Admin'],
+          summary: 'Update promo code (admin)',
+          security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AdminPromoCodePatch' },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: 'Updated',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      code: { type: 'string', example: 'SUCCESS_PROMO_CODE_ADMIN_UPDATED' },
+                      data: { $ref: '#/components/schemas/AdminPromoCode' },
+                    },
+                  },
+                },
+              },
+            },
+            401: {
+              description: 'Unauthorized',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            403: {
+              description: 'Authenticated but not admin',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            404: {
+              description: 'Promo or event not found',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            409: {
+              description: 'Duplicate code',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            422: {
+              description: 'Validation failed',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
             },
           },
         },

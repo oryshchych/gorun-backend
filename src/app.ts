@@ -12,6 +12,7 @@ import authRoutes from './routes/auth.routes';
 import cloudinaryRoutes from './routes/cloudinary.routes';
 import eventsRoutes from './routes/events.routes';
 import paymentsRoutes from './routes/payments.routes';
+import adminPromoCodesRoutes from './routes/admin.promoCodes.routes';
 import promoCodeRoutes from './routes/promoCodes.routes';
 import registrationsRoutes from './routes/registrations.routes';
 import webhooksRoutes from './routes/webhooks.routes';
@@ -120,6 +121,9 @@ const createApp = (): Application => {
 
   // Promo code validation
   app.use('/api/promo-codes', apiLimiter, promoCodeRoutes);
+
+  // Admin: promo code management
+  app.use('/api/admin/promo-codes', apiLimiter, adminPromoCodesRoutes);
 
   // Cloudinary routes
   app.use('/api/cloudinary', cloudinaryRoutes);

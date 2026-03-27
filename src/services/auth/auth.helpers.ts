@@ -30,6 +30,8 @@ export function formatUserResponse(user: IUser): UserResponse {
     image: user.image ?? null,
     provider: user.provider,
     providerId: user.providerId ?? null,
+    isAdmin: Boolean(user.isAdmin),
+    adminRole: user.isAdmin && user.adminRole ? user.adminRole : null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };

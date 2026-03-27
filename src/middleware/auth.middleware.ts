@@ -5,6 +5,9 @@ import { verifyAccessToken } from '../utils/jwt.util';
 export interface AuthRequest extends Request {
   user?: {
     userId: string;
+    /** Set after requireAdmin middleware */
+    isAdmin?: boolean;
+    adminRole?: 'admin' | 'super_admin' | null;
   };
 }
 

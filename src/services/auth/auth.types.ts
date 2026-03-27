@@ -34,6 +34,8 @@ export interface UserResponse {
   image: string | null;
   provider: string;
   providerId: string | null;
+  isAdmin: boolean;
+  adminRole: 'admin' | 'super_admin' | null;
   createdAt: Date;
   updatedAt: Date;
 }

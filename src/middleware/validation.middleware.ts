@@ -1,6 +1,9 @@
 import { NextFunction, Request, Response } from 'express';
 import { ZodError, z } from 'zod';
+import { VALIDATION_CODES } from '../types/codes';
 import { ValidationError } from '../types/errors';
+
+export type ValidateOptions = { statusCode?: number };
 
 export enum ValidationType {
   BODY = 'body',
@@ -8,7 +11,11 @@ export enum ValidationType {
   PARAMS = 'params',
 }
 
-export function validate(schema: z.ZodSchema, type: ValidationType = ValidationType.BODY) {
+export function validate(
+  schema: z.ZodSchema,
+  type: ValidationType = ValidationType.BODY,
+  options?: ValidateOptions
+) {
   return async (req: Request, _res: Response, next: NextFunction) => {
     try {
       const dataToValidate = req[type];
@@ -38,7 +45,13 @@ export function validate(schema: z.ZodSchema, type: ValidationType = ValidationT
           errorArray.push(issue.message);
         });
 
-        next(new ValidationError(errors));
+        next(
+          new ValidationError(
+            errors,
+            VALIDATION_CODES.ERROR_VALIDATION_FAILED,
+            options?.statusCode ?? 400
+          )
+        );
       } else {
         next(error);
       }

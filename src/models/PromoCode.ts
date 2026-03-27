@@ -5,7 +5,8 @@ export interface IPromoCode extends Document {
   code: string;
   discountType: 'percentage' | 'amount';
   discountValue: number;
-  usageLimit: number;
+  /** Omitted or unset = unlimited redemptions */
+  usageLimit?: number;
   usedCount: number;
   isActive: boolean;
   expirationDate?: Date;
@@ -35,8 +36,7 @@ const promoCodeSchema = new Schema<IPromoCode>(
     },
     usageLimit: {
       type: Number,
-      required: [true, 'Usage limit is required'],
-      min: [1, 'Usage limit must be at least 1'],
+      min: [1, 'Usage limit must be at least 1 when set'],
     },
     usedCount: {
       type: Number,

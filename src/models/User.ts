@@ -4,6 +4,9 @@ import mongoose, { Document, Schema } from 'mongoose';
 export const USER_GENDER_VALUES = ['female', 'male', 'other', 'prefer_not_to_say'] as const;
 export type UserGender = (typeof USER_GENDER_VALUES)[number];
 
+export const USER_ADMIN_ROLES = ['admin', 'super_admin'] as const;
+export type UserAdminRole = (typeof USER_ADMIN_ROLES)[number];
+
 export interface IUser extends Document {
   _id: mongoose.Types.ObjectId;
   name: string;
@@ -23,6 +26,8 @@ export interface IUser extends Document {
   runningClub?: string;
   city?: string;
   deliveryAddress?: string;
+  isAdmin: boolean;
+  adminRole?: UserAdminRole;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(password: string): Promise<boolean>;
@@ -114,6 +119,14 @@ const userSchema = new Schema<IUser>(
       maxlength: [2000, 'Delivery address must not exceed 2000 characters'],
       trim: true,
     },
+    isAdmin: {
+      type: Boolean,
+      default: false,
+    },
+    adminRole: {
+      type: String,
+      enum: USER_ADMIN_ROLES,
+    },
   },
   {
     timestamps: true,
@@ -191,6 +204,16 @@ userSchema.pre('save', function (next) {
     if (combined.length >= 2) {
       this.name = combined;
     }
+  }
+  next();
+});
+
+// Admin flag / role consistency: non-admins have no role; admins default to 'admin' if role missing
+userSchema.pre('save', function (next) {
+  if (!this.isAdmin) {
+    this.set('adminRole', undefined);
+  } else if (!this.adminRole) {
+    this.adminRole = 'admin';
   }
   next();
 });

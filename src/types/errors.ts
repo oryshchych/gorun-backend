@@ -27,9 +27,10 @@ export class ValidationError extends AppError {
 
   constructor(
     errors: Record<string, string[]>,
-    code: ErrorCode = 'ERROR_VALIDATION_FAILED' as ErrorCode
+    code: ErrorCode = 'ERROR_VALIDATION_FAILED' as ErrorCode,
+    statusCode: number = 400
   ) {
-    super('Validation failed', 400, code);
+    super('Validation failed', statusCode, code);
     this.errors = errors;
   }
 }
