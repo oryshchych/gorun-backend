@@ -1,28 +1,28 @@
 import { Request, Response } from 'express';
+import type { z } from 'zod';
 import { AuthRequest } from '../middleware/auth.middleware';
-import registrationsService from '../services/registrations.service';
+import registrationsService from '../services/registrations/registrations.service';
 import { REGISTRATIONS_CODES } from '../types/codes';
+import { getRegistrationsQuerySchema } from '../validators/registrations.validator';
+
+type GetRegistrationsQuery = z.infer<typeof getRegistrationsQuerySchema>;
 
 /**
  * Get all registrations with filters and pagination
  * GET /api/registrations
  */
 export const getRegistrations = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { eventId, status, page, limit } = req.query;
+  const { eventId, status, page, limit } = req.validatedQuery as GetRegistrationsQuery;
 
   // Build filters object, only including defined values
   const filters: {
     eventId?: string;
-    status?: 'confirmed' | 'cancelled';
+    status?: 'pending' | 'confirmed' | 'cancelled';
   } = {};
-  if (eventId) filters.eventId = eventId as string;
-  if (status) filters.status = status as 'confirmed' | 'cancelled';
+  if (eventId) filters.eventId = eventId;
+  if (status) filters.status = status;
 
-  const result = await registrationsService.getRegistrations(
-    filters,
-    page ? Number(page) : undefined,
-    limit ? Number(limit) : undefined
-  );
+  const result = await registrationsService.getRegistrations(filters, page, limit);
 
   res.status(200).json({
     success: true,
@@ -38,13 +38,9 @@ export const getRegistrations = async (req: AuthRequest, res: Response): Promise
  */
 export const getMyRegistrations = async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user!.userId;
-  const { page, limit } = req.query;
+  const { page, limit } = req.validatedQuery as GetRegistrationsQuery;
 
-  const result = await registrationsService.getMyRegistrations(
-    userId,
-    page ? Number(page) : undefined,
-    limit ? Number(limit) : undefined
-  );
+  const result = await registrationsService.getMyRegistrations(userId, page, limit);
 
   res.status(200).json({
     success: true,
@@ -59,9 +55,9 @@ export const getMyRegistrations = async (req: AuthRequest, res: Response): Promi
  * GET /api/events/:eventId/registrations
  */
 export const getEventRegistrations = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { eventId } = req.params;
+  const { eventId } = req.validatedParams as { eventId: string };
   const userId = req.user!.userId;
-  const { page, limit } = req.query;
+  const { page, limit } = req.validatedQuery as GetRegistrationsQuery;
 
   if (!eventId) {
     res.status(400).json({
@@ -71,12 +67,7 @@ export const getEventRegistrations = async (req: AuthRequest, res: Response): Pr
     return;
   }
 
-  const result = await registrationsService.getEventRegistrations(
-    eventId,
-    userId,
-    page ? Number(page) : undefined,
-    limit ? Number(limit) : undefined
-  );
+  const result = await registrationsService.getEventRegistrations(eventId, userId, page, limit);
 
   res.status(200).json({
     success: true,
@@ -125,7 +116,7 @@ export const createRegistration = async (req: AuthRequest, res: Response): Promi
  * DELETE /api/registrations/:id
  */
 export const cancelRegistration = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.validatedParams as { id: string };
   const userId = req.user!.userId;
 
   if (!id) {
@@ -150,7 +141,7 @@ export const cancelRegistration = async (req: AuthRequest, res: Response): Promi
  * GET /api/events/:eventId/participants
  */
 export const getPublicParticipants = async (req: Request, res: Response): Promise<void> => {
-  const { eventId } = req.params;
+  const { eventId } = req.validatedParams as { eventId: string };
 
   if (!eventId) {
     res.status(400).json({
@@ -175,7 +166,7 @@ export const getPublicParticipants = async (req: Request, res: Response): Promis
  * POST /api/registrations/:id/refund
  */
 export const processRefund = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.validatedParams as { id: string };
   const { amount, extRef } = req.body;
 
   if (!id) {
@@ -241,7 +232,7 @@ export const getPaymentLink = async (req: Request, res: Response): Promise<void>
  * Fallback mechanism to check payment status if webhook was missed
  */
 export const syncPaymentStatus = async (req: Request, res: Response): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.validatedParams as { id: string };
 
   if (!id) {
     res.status(400).json({

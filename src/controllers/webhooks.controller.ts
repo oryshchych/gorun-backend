@@ -3,9 +3,9 @@ import { Request, Response } from 'express';
 import { eventConfig, frontendConfig, paymentConfig } from '../config/env';
 import { logger } from '../config/logger';
 import { Event } from '../models/Event';
-import emailService from '../services/email.service';
-import paymentsService from '../services/payments.service';
-import registrationsService from '../services/registrations.service';
+import emailService from '../services/email/email.service';
+import paymentsService from '../services/payments/payments.service';
+import registrationsService from '../services/registrations/registrations.service';
 import { plataWebhookSchema } from '../validators/webhooks.validator';
 
 /**

@@ -5,6 +5,8 @@ export interface IRefreshToken extends Document {
   userId: mongoose.Types.ObjectId;
   token: string;
   expiresAt: Date;
+  /** Matches JWT refresh TTL: long when rememberMe / OAuth remember_me */
+  longLived: boolean;
   createdAt: Date;
 }
 
@@ -26,6 +28,10 @@ const refreshTokenSchema = new Schema<IRefreshToken, IRefreshTokenModel>(
     expiresAt: {
       type: Date,
       required: [true, 'Expiration date is required'],
+    },
+    longLived: {
+      type: Boolean,
+      default: false,
     },
   },
   {

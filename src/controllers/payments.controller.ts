@@ -1,13 +1,13 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import paymentsService from '../services/payments.service';
+import paymentsService from '../services/payments/payments.service';
 
 /**
  * Check payment status from Monobank API (fallback)
  * GET /api/payments/:id/status
  */
 export const checkPaymentStatus = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.validatedParams as { id: string };
 
   if (!id) {
     res.status(400).json({
@@ -38,7 +38,7 @@ export const checkPaymentStatus = async (req: AuthRequest, res: Response): Promi
  * GET /api/payments/:id/receipt
  */
 export const getPaymentReceipt = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { id } = req.params;
+  const { id } = req.validatedParams as { id: string };
 
   if (!id) {
     res.status(400).json({

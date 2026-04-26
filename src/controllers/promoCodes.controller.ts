@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import promoCodesService from '../services/promoCodes.service';
+import promoCodesService from '../services/promoCodes/promoCodes.service';
 import { PROMO_CODES_CODES } from '../types/codes';
 
 export const validatePromoCode = async (req: Request, res: Response): Promise<void> => {

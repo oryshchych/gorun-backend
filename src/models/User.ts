@@ -1,14 +1,33 @@
 import bcrypt from 'bcrypt';
 import mongoose, { Document, Schema } from 'mongoose';
 
+export const USER_GENDER_VALUES = ['female', 'male', 'other', 'prefer_not_to_say'] as const;
+export type UserGender = (typeof USER_GENDER_VALUES)[number];
+
+export const USER_ADMIN_ROLES = ['admin', 'super_admin'] as const;
+export type UserAdminRole = (typeof USER_ADMIN_ROLES)[number];
+
 export interface IUser extends Document {
   _id: mongoose.Types.ObjectId;
   name: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
   email: string;
   password: string;
   image?: string;
   provider: 'credentials' | 'google';
   providerId?: string;
+  /** ISO date-only YYYY-MM-DD */
+  dateOfBirth?: string;
+  gender?: UserGender;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  runningClub?: string;
+  city?: string;
+  deliveryAddress?: string;
+  isAdmin: boolean;
+  adminRole?: UserAdminRole;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(password: string): Promise<boolean>;
@@ -20,8 +39,25 @@ const userSchema = new Schema<IUser>(
       type: String,
       required: [true, 'Name is required'],
       minlength: [2, 'Name must be at least 2 characters'],
-      maxlength: [50, 'Name must not exceed 50 characters'],
+      maxlength: [100, 'Name must not exceed 100 characters'],
       trim: true,
+    },
+    firstName: {
+      type: String,
+      maxlength: [100, 'First name must not exceed 100 characters'],
+      trim: true,
+    },
+    lastName: {
+      type: String,
+      maxlength: [100, 'Last name must not exceed 100 characters'],
+      trim: true,
+    },
+    phone: {
+      type: String,
+      trim: true,
+      sparse: true,
+      unique: true,
+      match: [/^\+[1-9]\d{6,14}$/, 'Phone must be in E.164 format'],
     },
     email: {
       type: String,
@@ -48,6 +84,48 @@ const userSchema = new Schema<IUser>(
     providerId: {
       type: String,
       // No default - field is omitted when not provided
+    },
+    dateOfBirth: {
+      type: String,
+      trim: true,
+      match: [/^\d{4}-\d{2}-\d{2}$/, 'dateOfBirth must be YYYY-MM-DD'],
+    },
+    gender: {
+      type: String,
+      enum: USER_GENDER_VALUES,
+    },
+    emergencyContactName: {
+      type: String,
+      maxlength: [200, 'Emergency contact name must not exceed 200 characters'],
+      trim: true,
+    },
+    emergencyContactPhone: {
+      type: String,
+      trim: true,
+      match: [/^\+[1-9]\d{6,14}$/, 'Emergency phone must be in E.164 format'],
+    },
+    runningClub: {
+      type: String,
+      maxlength: [200, 'Running club must not exceed 200 characters'],
+      trim: true,
+    },
+    city: {
+      type: String,
+      maxlength: [100, 'City must not exceed 100 characters'],
+      trim: true,
+    },
+    deliveryAddress: {
+      type: String,
+      maxlength: [2000, 'Delivery address must not exceed 2000 characters'],
+      trim: true,
+    },
+    isAdmin: {
+      type: Boolean,
+      default: false,
+    },
+    adminRole: {
+      type: String,
+      enum: USER_ADMIN_ROLES,
     },
   },
   {
@@ -117,6 +195,27 @@ userSchema.pre('save', async function (next) {
   } catch (error) {
     next(error as Error);
   }
+});
+
+// Derive display name from first + last when both set
+userSchema.pre('save', function (next) {
+  if (this.firstName && this.lastName) {
+    const combined = `${this.firstName} ${this.lastName}`.trim();
+    if (combined.length >= 2) {
+      this.name = combined;
+    }
+  }
+  next();
+});
+
+// Admin flag / role consistency: non-admins have no role; admins default to 'admin' if role missing
+userSchema.pre('save', function (next) {
+  if (!this.isAdmin) {
+    this.set('adminRole', undefined);
+  } else if (!this.adminRole) {
+    this.adminRole = 'admin';
+  }
+  next();
 });
 
 export const User = mongoose.model<IUser>('User', userSchema);

@@ -31,6 +31,8 @@ const options: swaggerJsdoc.Options = {
         // User schemas
         User: {
           type: 'object',
+          description:
+            'Stable keys; optional profile fields are null when unset. firstName/lastName may be derived from name until set explicitly.',
           properties: {
             id: {
               type: 'string',
@@ -39,17 +41,60 @@ const options: swaggerJsdoc.Options = {
             },
             name: {
               type: 'string',
-              description: 'User full name',
+              description: 'User full name (derived or legacy)',
               example: 'John Doe',
+            },
+            firstName: {
+              type: 'string',
+              nullable: true,
+              description: 'Given name',
+              example: 'John',
+            },
+            lastName: {
+              type: 'string',
+              nullable: true,
+              description: 'Family name',
+              example: 'Doe',
+            },
+            phone: {
+              type: 'string',
+              nullable: true,
+              description: 'E.164 when set',
+              example: '+380501234567',
             },
             email: {
               type: 'string',
               format: 'email',
-              description: 'User email address',
+              description: 'User email (read-only in profile PATCH)',
               example: 'john.doe@example.com',
+            },
+            dateOfBirth: {
+              type: 'string',
+              nullable: true,
+              description: 'YYYY-MM-DD',
+              example: '1990-05-15',
+            },
+            gender: {
+              type: 'string',
+              nullable: true,
+              enum: ['female', 'male', 'other', 'prefer_not_to_say'],
+            },
+            emergencyContactName: { type: 'string', nullable: true },
+            emergencyContactPhone: {
+              type: 'string',
+              nullable: true,
+              description: 'E.164 when set',
+            },
+            runningClub: { type: 'string', nullable: true },
+            city: { type: 'string', nullable: true },
+            deliveryAddress: {
+              type: 'string',
+              nullable: true,
+              description: 'Free text, max 2000 chars',
             },
             image: {
               type: 'string',
+              nullable: true,
               format: 'uri',
               description: 'User profile image URL',
               example: 'https://example.com/avatar.jpg',
@@ -59,6 +104,11 @@ const options: swaggerJsdoc.Options = {
               enum: ['credentials', 'google'],
               description: 'Authentication provider',
               example: 'credentials',
+            },
+            providerId: {
+              type: 'string',
+              nullable: true,
+              description: 'OAuth subject id when provider is google',
             },
             createdAt: {
               type: 'string',
@@ -70,17 +120,69 @@ const options: swaggerJsdoc.Options = {
               format: 'date-time',
               description: 'Last update timestamp',
             },
+            isAdmin: {
+              type: 'boolean',
+              description: 'When true, user may access admin UI and admin APIs',
+              example: false,
+            },
+            adminRole: {
+              type: 'string',
+              nullable: true,
+              enum: ['admin', 'super_admin'],
+              description: 'Set only when isAdmin is true; otherwise null',
+            },
+          },
+        },
+        UpdateProfileInput: {
+          type: 'object',
+          description:
+            'Partial profile. Omit a property to leave it unchanged; set to null to clear. email/id are not allowed (extra keys rejected). dateOfBirth: valid YYYY-MM-DD, not in the future, age 18+.',
+          additionalProperties: false,
+          properties: {
+            firstName: { type: 'string', nullable: true, maxLength: 100 },
+            lastName: { type: 'string', nullable: true, maxLength: 100 },
+            phone: { type: 'string', nullable: true, description: 'E.164' },
+            dateOfBirth: { type: 'string', nullable: true, example: '1990-05-15' },
+            gender: {
+              type: 'string',
+              nullable: true,
+              enum: ['female', 'male', 'other', 'prefer_not_to_say'],
+            },
+            emergencyContactName: { type: 'string', nullable: true, maxLength: 200 },
+            emergencyContactPhone: { type: 'string', nullable: true },
+            runningClub: { type: 'string', nullable: true, maxLength: 200 },
+            city: { type: 'string', nullable: true, maxLength: 100 },
+            deliveryAddress: { type: 'string', nullable: true, maxLength: 2000 },
           },
         },
         RegisterInput: {
           type: 'object',
-          required: ['name', 'email', 'password'],
+          required: ['email', 'password'],
+          description:
+            'Preferred: firstName, lastName, phone (E.164), email, password. Legacy: name (min 2 chars), email, password; optional phone.',
           properties: {
+            firstName: {
+              type: 'string',
+              minLength: 1,
+              maxLength: 100,
+              example: 'John',
+            },
+            lastName: {
+              type: 'string',
+              minLength: 1,
+              maxLength: 100,
+              example: 'Doe',
+            },
+            phone: {
+              type: 'string',
+              description: 'E.164, e.g. +380501234567',
+              example: '+380501234567',
+            },
             name: {
               type: 'string',
               minLength: 2,
-              maxLength: 50,
-              description: 'User full name',
+              maxLength: 100,
+              description: 'Deprecated: full name; use firstName + lastName + phone',
               example: 'John Doe',
             },
             email: {
@@ -113,23 +215,62 @@ const options: swaggerJsdoc.Options = {
               description: 'User password',
               example: 'SecurePass123!',
             },
+            rememberMe: {
+              type: 'boolean',
+              default: false,
+              description:
+                'If true, refresh token TTL uses JWT_REFRESH_EXPIRY_LONG (default 30d); if false, JWT_REFRESH_EXPIRY (default 7d). Access token TTL unchanged.',
+            },
           },
         },
         AuthResponse: {
           type: 'object',
+          description:
+            'Wrapped in API as { success, data: { user, accessToken, refreshToken } }. Refresh JWT exp matches DB session (short vs long).',
           properties: {
             user: {
               $ref: '#/components/schemas/User',
             },
             accessToken: {
               type: 'string',
-              description: 'JWT access token (expires in 15 minutes)',
+              description: `JWT access token (exp: ${config.JWT_ACCESS_EXPIRY} by default)`,
               example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
             },
             refreshToken: {
               type: 'string',
-              description: 'JWT refresh token (expires in 7 days)',
+              description: `JWT refresh token — ${config.JWT_REFRESH_EXPIRY} without remember-me / OAuth remember_me=false; ${config.JWT_REFRESH_EXPIRY_LONG} with remember-me / remember_me=true`,
               example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+            },
+          },
+        },
+        ForgotPasswordInput: {
+          type: 'object',
+          required: ['email'],
+          properties: {
+            email: { type: 'string', format: 'email' },
+            locale: {
+              type: 'string',
+              description: 'BCP-47-ish locale for email template (e.g. uk, en)',
+              example: 'uk',
+            },
+          },
+        },
+        ResetPasswordInput: {
+          type: 'object',
+          required: ['token', 'password', 'confirmPassword'],
+          properties: {
+            token: { type: 'string', description: 'Opaque token from reset email' },
+            password: { type: 'string', minLength: 8, maxLength: 100 },
+            confirmPassword: { type: 'string' },
+          },
+        },
+        OAuthExchangeInput: {
+          type: 'object',
+          required: ['code'],
+          properties: {
+            code: {
+              type: 'string',
+              description: 'One-time code from frontend callback query (short TTL, default 60s)',
             },
           },
         },
@@ -577,6 +718,56 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        AdminPromoCode: {
+          type: 'object',
+          description:
+            'Admin promo resource; discountType uses fixed (maps to amount in DB). code is uppercase.',
+          properties: {
+            id: { type: 'string', example: '507f1f77bcf86cd799439011' },
+            code: { type: 'string', example: 'EARLY10' },
+            discountType: { type: 'string', enum: ['percentage', 'fixed'] },
+            discountValue: { type: 'number', example: 10 },
+            eventId: { type: 'string', nullable: true },
+            isActive: { type: 'boolean' },
+            usageLimit: { type: 'integer', nullable: true, description: 'null = unlimited' },
+            usedCount: { type: 'integer' },
+            expirationDate: { type: 'string', format: 'date-time', nullable: true },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        AdminPromoCodeCreate: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['code', 'discountType', 'discountValue', 'eventId'],
+          properties: {
+            code: { type: 'string', maxLength: 50 },
+            discountType: { type: 'string', enum: ['percentage', 'fixed'] },
+            discountValue: { type: 'number', minimum: 0 },
+            eventId: { type: 'string', description: 'Mongo ObjectId' },
+            isActive: { type: 'boolean', default: true },
+            usageLimit: { type: 'integer', minimum: 1, nullable: true },
+            expirationDate: {
+              type: 'string',
+              nullable: true,
+              description: 'Parseable date string',
+            },
+          },
+        },
+        AdminPromoCodePatch: {
+          type: 'object',
+          additionalProperties: false,
+          description: 'Partial update; at least one field recommended',
+          properties: {
+            code: { type: 'string', maxLength: 50 },
+            discountType: { type: 'string', enum: ['percentage', 'fixed'] },
+            discountValue: { type: 'number', minimum: 0 },
+            eventId: { type: 'string' },
+            isActive: { type: 'boolean' },
+            usageLimit: { type: 'integer', minimum: 1, nullable: true },
+            expirationDate: { type: 'string', nullable: true },
+          },
+        },
         // Error schemas
         Error: {
           type: 'object',
@@ -753,6 +944,10 @@ const options: swaggerJsdoc.Options = {
         description: 'Promo code validation endpoints',
       },
       {
+        name: 'Admin',
+        description: 'Admin-only endpoints (JWT + isAdmin)',
+      },
+      {
         name: 'Health',
         description: 'Health check endpoints',
       },
@@ -781,7 +976,8 @@ const options: swaggerJsdoc.Options = {
         post: {
           tags: ['Authentication'],
           summary: 'Register a new user',
-          description: 'Create a new user account with email and password',
+          description:
+            'Create account. Prefer firstName, lastName, phone (E.164), email, password. Legacy: name + email + password.',
           requestBody: {
             required: true,
             content: {
@@ -840,7 +1036,8 @@ const options: swaggerJsdoc.Options = {
         post: {
           tags: ['Authentication'],
           summary: 'Login user',
-          description: 'Authenticate user with email and password',
+          description:
+            'Authenticate with email and password. Optional rememberMe controls refresh JWT TTL (see JWT_REFRESH_EXPIRY vs JWT_REFRESH_EXPIRY_LONG).',
           requestBody: {
             required: true,
             content: {
@@ -982,7 +1179,8 @@ const options: swaggerJsdoc.Options = {
         get: {
           tags: ['Authentication'],
           summary: 'Get current user',
-          description: 'Get the profile of the currently authenticated user',
+          description:
+            'Full profile: stable field names; unset optional fields are null. email is read-only in UI.',
           security: [
             {
               bearerAuth: [],
@@ -994,7 +1192,11 @@ const options: swaggerJsdoc.Options = {
               content: {
                 'application/json': {
                   schema: {
-                    $ref: '#/components/schemas/User',
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      data: { $ref: '#/components/schemas/User' },
+                    },
                   },
                 },
               },
@@ -1008,6 +1210,234 @@ const options: swaggerJsdoc.Options = {
                   },
                 },
               },
+            },
+          },
+        },
+        patch: {
+          tags: ['Authentication'],
+          summary: 'Update current user profile',
+          description:
+            'Partial PATCH: omit keys to keep values; null clears a field. Cannot change email or id. Returns full User (same as GET /me).',
+          security: [
+            {
+              bearerAuth: [],
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  $ref: '#/components/schemas/UpdateProfileInput',
+                },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: 'Updated profile',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      data: { $ref: '#/components/schemas/User' },
+                    },
+                  },
+                },
+              },
+            },
+            400: {
+              description: 'Validation error',
+              content: {
+                'application/json': {
+                  schema: {
+                    $ref: '#/components/schemas/Error',
+                  },
+                },
+              },
+            },
+            401: {
+              description: 'Unauthorized',
+              content: {
+                'application/json': {
+                  schema: {
+                    $ref: '#/components/schemas/Error',
+                  },
+                },
+              },
+            },
+            409: {
+              description: 'Phone already in use',
+              content: {
+                'application/json': {
+                  schema: {
+                    $ref: '#/components/schemas/Error',
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      '/api/auth/google': {
+        get: {
+          tags: ['Authentication'],
+          summary: 'Start Google OAuth',
+          description:
+            '302 redirect to Google. Query redirect_uri must be whitelisted (FRONTEND_OAUTH_REDIRECT_ORIGINS + FRONTEND_URL). Google Console redirect_uri must be backend GOOGLE_OAUTH_REDIRECT_URI only (e.g. …/api/auth/google/callback).',
+          parameters: [
+            {
+              name: 'redirect_uri',
+              in: 'query',
+              required: true,
+              schema: { type: 'string', format: 'uri' },
+              description: 'Frontend URL to return to with ?code= one-time exchange code',
+            },
+            {
+              name: 'locale',
+              in: 'query',
+              required: false,
+              schema: { type: 'string' },
+            },
+            {
+              name: 'remember_me',
+              in: 'query',
+              required: false,
+              schema: { type: 'string', enum: ['true', 'false', '1', '0'] },
+              description:
+                'Maps to long-lived refresh token after exchange (same as login rememberMe)',
+            },
+          ],
+          responses: {
+            302: { description: 'Redirect to accounts.google.com' },
+            400: {
+              description: 'Invalid redirect_uri or validation error',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            503: { description: 'Google OAuth not configured' },
+          },
+        },
+      },
+      '/api/auth/google/callback': {
+        get: {
+          tags: ['Authentication'],
+          summary: 'Google OAuth callback',
+          description:
+            'Handled by Google redirect; do not call from frontend directly. 302 to frontend with code or oauth_error.',
+          parameters: [
+            { name: 'code', in: 'query', schema: { type: 'string' } },
+            { name: 'state', in: 'query', schema: { type: 'string' } },
+            { name: 'error', in: 'query', schema: { type: 'string' } },
+          ],
+          responses: {
+            302: {
+              description: 'Redirect to frontend redirect_uri or FRONTEND_URL with query params',
+            },
+          },
+        },
+      },
+      '/api/auth/oauth/exchange': {
+        post: {
+          tags: ['Authentication'],
+          summary: 'Exchange OAuth one-time code for JWT',
+          description:
+            'Same response shape as POST /api/auth/login (user + accessToken + refreshToken). Code is single-use.',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/OAuthExchangeInput' },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: 'Tokens issued',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean' },
+                      data: { $ref: '#/components/schemas/AuthResponse' },
+                    },
+                  },
+                },
+              },
+            },
+            400: {
+              description: 'Invalid or expired code',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+          },
+        },
+      },
+      '/api/auth/forgot-password': {
+        post: {
+          tags: ['Authentication'],
+          summary: 'Request password reset',
+          description:
+            'Always returns 200 with the same message (no email enumeration). Email sent if user exists (Resend configured).',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ForgotPasswordInput' },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: 'Generic success',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      message: { type: 'string' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      '/api/auth/reset-password': {
+        post: {
+          tags: ['Authentication'],
+          summary: 'Reset password with token',
+          description:
+            'Invalidates all refresh sessions for the user on success. Token TTL from PASSWORD_RESET_TOKEN_EXPIRY (default 1h).',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ResetPasswordInput' },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: 'Password updated',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean' },
+                      message: { type: 'string' },
+                    },
+                  },
+                },
+              },
+            },
+            400: {
+              description: 'Validation or invalid token',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
             },
           },
         },
@@ -1984,6 +2414,221 @@ const options: swaggerJsdoc.Options = {
                   schema: { $ref: '#/components/schemas/Error' },
                 },
               },
+            },
+          },
+        },
+      },
+      '/api/admin/promo-codes': {
+        get: {
+          tags: ['Admin'],
+          summary: 'List promo codes (admin)',
+          description: 'Paginated list with optional filters. Requires admin user.',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'page',
+              in: 'query',
+              schema: { type: 'integer', minimum: 1, default: 1 },
+            },
+            {
+              name: 'limit',
+              in: 'query',
+              schema: { type: 'integer', minimum: 1, maximum: 100, default: 10 },
+            },
+            {
+              name: 'eventId',
+              in: 'query',
+              schema: { type: 'string' },
+              description: 'Filter by event ObjectId',
+            },
+            {
+              name: 'isActive',
+              in: 'query',
+              schema: { type: 'string', enum: ['true', 'false'] },
+            },
+            {
+              name: 'search',
+              in: 'query',
+              schema: { type: 'string', maxLength: 100 },
+              description: 'Case-insensitive substring match on code',
+            },
+          ],
+          responses: {
+            200: {
+              description: 'List retrieved',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      code: {
+                        type: 'string',
+                        example: 'SUCCESS_PROMO_CODES_ADMIN_LIST_RETRIEVED',
+                      },
+                      data: {
+                        type: 'array',
+                        items: { $ref: '#/components/schemas/AdminPromoCode' },
+                      },
+                      pagination: { $ref: '#/components/schemas/Pagination' },
+                    },
+                  },
+                },
+              },
+            },
+            401: {
+              description: 'Unauthorized',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            403: {
+              description: 'Authenticated but not admin',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            422: {
+              description: 'Query validation failed',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+          },
+        },
+        post: {
+          tags: ['Admin'],
+          summary: 'Create promo code (admin)',
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AdminPromoCodeCreate' },
+              },
+            },
+          },
+          responses: {
+            201: {
+              description: 'Created',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      code: { type: 'string', example: 'SUCCESS_PROMO_CODE_ADMIN_CREATED' },
+                      data: { $ref: '#/components/schemas/AdminPromoCode' },
+                    },
+                  },
+                },
+              },
+            },
+            401: {
+              description: 'Unauthorized',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            403: {
+              description: 'Authenticated but not admin',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            404: {
+              description: 'Event not found',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            409: {
+              description: 'Duplicate code',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            422: {
+              description: 'Body validation failed',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+          },
+        },
+      },
+      '/api/admin/promo-codes/{id}': {
+        get: {
+          tags: ['Admin'],
+          summary: 'Get promo code by id (admin)',
+          security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: {
+            200: {
+              description: 'Promo code',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      code: { type: 'string', example: 'SUCCESS_PROMO_CODE_RETRIEVED' },
+                      data: { $ref: '#/components/schemas/AdminPromoCode' },
+                    },
+                  },
+                },
+              },
+            },
+            401: {
+              description: 'Unauthorized',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            403: {
+              description: 'Authenticated but not admin',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            404: {
+              description: 'Promo code not found',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            422: {
+              description: 'Invalid id format',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+          },
+        },
+        patch: {
+          tags: ['Admin'],
+          summary: 'Update promo code (admin)',
+          security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AdminPromoCodePatch' },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: 'Updated',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      code: { type: 'string', example: 'SUCCESS_PROMO_CODE_ADMIN_UPDATED' },
+                      data: { $ref: '#/components/schemas/AdminPromoCode' },
+                    },
+                  },
+                },
+              },
+            },
+            401: {
+              description: 'Unauthorized',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            403: {
+              description: 'Authenticated but not admin',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            404: {
+              description: 'Promo or event not found',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            409: {
+              description: 'Duplicate code',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+            },
+            422: {
+              description: 'Validation failed',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
             },
           },
         },
