@@ -13,6 +13,7 @@ import {
   getEventRegistrations,
   getPublicParticipants,
 } from '../controllers/registrations.controller';
+import { getEventResults } from '../controllers/results.controller';
 import { authenticate, optionalAuthenticate } from '../middleware/auth.middleware';
 import { isEventOrganizerOrAdmin } from '../middleware/authorization.middleware';
 import { ValidationType, validate } from '../middleware/validation.middleware';
@@ -117,6 +118,16 @@ router.delete(
   validate(eventIdSchema, ValidationType.PARAMS),
   isEventOrganizerOrAdmin,
   asyncHandler(deleteEvent)
+);
+
+/**
+ * GET /api/events/:id/results
+ * Public race results for an event (empty array when not yet available)
+ */
+router.get(
+  '/:id/results',
+  validate(eventIdSchema, ValidationType.PARAMS),
+  asyncHandler(getEventResults)
 );
 
 /**

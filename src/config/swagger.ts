@@ -131,13 +131,28 @@ const options: swaggerJsdoc.Options = {
               enum: ['admin', 'super_admin'],
               description: 'Set only when isAdmin is true; otherwise null',
             },
+            kids: {
+              type: 'array',
+              description: 'Children linked to this profile (for kids race entries)',
+              items: { $ref: '#/components/schemas/KidProfile' },
+            },
+            totalKm: {
+              type: 'number',
+              description: 'Total kilometres from confirmed registrations (computed on-the-fly)',
+              example: 63.5,
+            },
+            totalDonated: {
+              type: 'number',
+              description:
+                'Total UAH donated to AFU across confirmed registrations (computed on-the-fly)',
+              example: 300,
+            },
           },
         },
         UpdateProfileInput: {
           type: 'object',
           description:
-            'Partial profile. Omit a property to leave it unchanged; set to null to clear. email/id are not allowed (extra keys rejected). dateOfBirth: valid YYYY-MM-DD, not in the future, age 18+.',
-          additionalProperties: false,
+            'Partial profile. Omit a property to leave it unchanged; set to null to clear. dateOfBirth: valid YYYY-MM-DD, not in the future, age 18+. kids replaces the full kids array.',
           properties: {
             firstName: { type: 'string', nullable: true, maxLength: 100 },
             lastName: { type: 'string', nullable: true, maxLength: 100 },
@@ -153,6 +168,11 @@ const options: swaggerJsdoc.Options = {
             runningClub: { type: 'string', nullable: true, maxLength: 200 },
             city: { type: 'string', nullable: true, maxLength: 100 },
             deliveryAddress: { type: 'string', nullable: true, maxLength: 2000 },
+            kids: {
+              type: 'array',
+              description: 'Full replacement of kids list. Omit to leave unchanged.',
+              items: { $ref: '#/components/schemas/KidProfile' },
+            },
           },
         },
         RegisterInput: {
@@ -1043,6 +1063,32 @@ const options: swaggerJsdoc.Options = {
             runningClub: { type: 'string', example: 'Kyiv Running Club' },
             phone: { type: 'string', example: '+380501234567' },
             promoCode: { type: 'string', example: 'DISCOUNT10' },
+            distanceId: {
+              type: 'string',
+              example: '21k',
+              description: 'Selected distance ID from event.distances',
+            },
+            distanceLabel: {
+              type: 'string',
+              example: '21K',
+              description: 'Denormalized label for display',
+            },
+            shirtSize: { type: 'string', example: 'M' },
+            estimatedPace: {
+              type: 'string',
+              example: '5:30',
+              description: 'Estimated pace per km for corral seeding',
+            },
+            afuDonation: {
+              type: 'number',
+              minimum: 0,
+              example: 100,
+              description: 'Optional AFU charity donation (UAH)',
+            },
+            kidsRegistrations: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/KidRegistration' },
+            },
           },
         },
         PublicRegistration: {
@@ -1061,10 +1107,21 @@ const options: swaggerJsdoc.Options = {
             paymentStatus: { type: 'string', enum: ['pending', 'completed', 'failed'] },
             registeredAt: { type: 'string', format: 'date-time' },
             finalPrice: { type: 'number', example: 900 },
+            distanceId: { type: 'string' },
+            distanceLabel: { type: 'string' },
+            shirtSize: { type: 'string' },
+            estimatedPace: { type: 'string' },
+            afuDonation: { type: 'number' },
+            bib: { type: 'string', nullable: true },
+            kidsRegistrations: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/KidRegistration' },
+            },
           },
         },
         Participant: {
           type: 'object',
+          description: 'Public participant in the runners list',
           properties: {
             id: { type: 'string' },
             name: { type: 'string' },
@@ -1072,6 +1129,54 @@ const options: swaggerJsdoc.Options = {
             city: { type: 'string' },
             runningClub: { type: 'string' },
             registeredAt: { type: 'string', format: 'date-time' },
+            bib: {
+              type: 'string',
+              nullable: true,
+              description: 'Bib number; null if not yet assigned',
+            },
+            distance: {
+              type: 'string',
+              description: 'Distance label from registration, e.g. "21K"',
+            },
+          },
+        },
+        KidProfile: {
+          type: 'object',
+          description: 'Child profile stored on the user account',
+          properties: {
+            id: { type: 'string' },
+            name: { type: 'string', example: 'Mia' },
+            age: { type: 'integer', minimum: 0, maximum: 17, example: 6 },
+            shirtSize: { type: 'string', example: '104' },
+          },
+        },
+        KidRegistration: {
+          type: 'object',
+          description: 'One child entry in a registration',
+          required: ['name', 'age', 'distanceId', 'distanceLabel'],
+          properties: {
+            kidId: { type: 'string', description: 'Profile kid ID (if linked to profile)' },
+            name: { type: 'string', example: 'Mia' },
+            age: { type: 'integer', minimum: 0, example: 6 },
+            distanceId: { type: 'string', example: 'kids-100' },
+            distanceLabel: { type: 'string', example: '100m' },
+            shirtSize: { type: 'string', example: '104' },
+          },
+        },
+        EventResult: {
+          type: 'object',
+          description: 'Finisher record for a completed event',
+          properties: {
+            id: { type: 'string' },
+            position: { type: 'integer', description: 'Overall finish position', example: 1 },
+            positionGender: { type: 'integer', example: 1 },
+            positionAge: { type: 'integer', example: 1 },
+            bib: { type: 'string', example: '042' },
+            name: { type: 'string', example: 'Ivan Kovalenko' },
+            city: { type: 'string', example: 'Lviv' },
+            distance: { type: 'string', example: '21K' },
+            finishTime: { type: 'string', example: '1:42:30' },
+            paceMinKm: { type: 'string', example: '4:52' },
           },
         },
         Payment: {
@@ -2079,6 +2184,48 @@ const options: swaggerJsdoc.Options = {
                   schema: { $ref: '#/components/schemas/Error' },
                 },
               },
+            },
+          },
+        },
+      },
+      '/api/events/{id}/results': {
+        get: {
+          tags: ['Events'],
+          summary: 'Get event race results',
+          description:
+            'Returns finisher records for a completed event sorted by overall position. ' +
+            'Returns an empty array (not 404) when no results have been uploaded yet. ' +
+            'Returns 404 if the event itself does not exist.',
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              description: 'Event ID',
+              schema: { type: 'string' },
+            },
+          ],
+          responses: {
+            200: {
+              description: 'Results retrieved successfully (empty array when not yet available)',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean' },
+                      data: {
+                        type: 'array',
+                        items: { $ref: '#/components/schemas/EventResult' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            404: {
+              description: 'Event not found',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
             },
           },
         },

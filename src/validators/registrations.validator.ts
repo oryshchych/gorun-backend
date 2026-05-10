@@ -42,6 +42,23 @@ export const createPublicRegistrationSchema = z.object({
     })
     .optional(),
   promoCode: z.string().max(50, { message: 'Promo code must not exceed 50 characters' }).optional(),
+  distanceId: z.string().optional(),
+  distanceLabel: z.string().optional(),
+  shirtSize: z.string().optional(),
+  estimatedPace: z.string().optional(),
+  afuDonation: z.number().min(0).optional(),
+  kidsRegistrations: z
+    .array(
+      z.object({
+        kidId: z.string().optional(),
+        name: z.string().min(1),
+        age: z.number().int().min(0),
+        distanceId: z.string().min(1),
+        distanceLabel: z.string().min(1),
+        shirtSize: z.string().optional(),
+      })
+    )
+    .optional(),
 });
 
 export const registrationIdSchema = z.object({

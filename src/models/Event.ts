@@ -27,15 +27,21 @@ export interface Speaker {
   instagramLink: string;
 }
 
+export interface DistanceSpots {
+  taken?: number;
+  total?: number;
+}
+
 export interface Distance {
   id?: string;
   label?: string;
   name?: string;
   km?: number;
   feeUah?: number;
-  elevation?: number;
-  laps?: number;
-  spots?: number;
+  /** Human-readable elevation gain, e.g. "+420m" */
+  elevation?: string;
+  laps?: number | null;
+  spots?: DistanceSpots;
 }
 
 export interface KidsDistance {
@@ -357,9 +363,15 @@ const eventSchema = new Schema<IEvent>(
           name: { type: String, trim: true },
           km: { type: Number },
           feeUah: { type: Number },
-          elevation: { type: Number },
+          elevation: { type: String, trim: true },
           laps: { type: Number },
-          spots: { type: Number },
+          spots: {
+            type: {
+              taken: { type: Number, min: 0 },
+              total: { type: Number, min: 0 },
+            },
+            default: undefined,
+          },
         },
       ],
       default: undefined,

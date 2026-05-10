@@ -99,15 +99,20 @@ const translationsSchema = z.object({
     .optional(),
 });
 
+const distanceSpotsSchema = z.object({
+  taken: z.number().int().min(0).optional(),
+  total: z.number().int().min(0).optional(),
+});
+
 const distanceSchema = z.object({
   id: z.string().optional(),
   label: z.string().trim().optional(),
   name: z.string().trim().optional(),
   km: z.number().optional(),
   feeUah: z.number().optional(),
-  elevation: z.number().optional(),
-  laps: z.number().optional(),
-  spots: z.number().optional(),
+  elevation: z.string().trim().optional(),
+  laps: z.number().nullable().optional(),
+  spots: distanceSpotsSchema.optional(),
 });
 
 const kidsDistanceSchema = z.object({

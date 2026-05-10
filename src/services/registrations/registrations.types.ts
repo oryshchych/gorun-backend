@@ -1,4 +1,7 @@
 import mongoose from 'mongoose';
+import type { KidRegistration } from '../../models/Registration';
+
+export type { KidRegistration } from '../../models/Registration';
 
 export interface CreateRegistrationInput {
   eventId: string;
@@ -13,6 +16,12 @@ export interface CreatePublicRegistrationInput {
   runningClub?: string;
   phone?: string;
   promoCode?: string;
+  distanceId?: string;
+  distanceLabel?: string;
+  shirtSize?: string;
+  estimatedPace?: string;
+  afuDonation?: number;
+  kidsRegistrations?: KidRegistration[];
 }
 
 export interface RegistrationFilters {
@@ -60,6 +69,13 @@ export interface RegistrationResponse {
   paymentStatus?: 'pending' | 'completed' | 'failed';
   paymentId?: string;
   finalPrice?: number;
+  distanceId?: string;
+  distanceLabel?: string;
+  shirtSize?: string;
+  estimatedPace?: string;
+  afuDonation?: number;
+  bib?: string;
+  kidsRegistrations?: KidRegistration[];
   event?: PopulatedEvent;
   user?: PopulatedUser;
 }
@@ -71,4 +87,6 @@ export interface PublicParticipant {
   city?: string;
   runningClub?: string;
   registeredAt: Date;
+  bib?: string | null;
+  distance?: string;
 }

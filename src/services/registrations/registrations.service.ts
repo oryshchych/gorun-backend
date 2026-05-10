@@ -49,6 +49,13 @@ type RegistrationDoc = {
   paymentStatus?: 'pending' | 'completed' | 'failed';
   paymentId?: string;
   finalPrice?: number;
+  distanceId?: string;
+  distanceLabel?: string;
+  shirtSize?: string;
+  estimatedPace?: string;
+  afuDonation?: number;
+  bib?: string;
+  kidsRegistrations?: import('../../models/Registration').KidRegistration[];
   event?: PopulatedEvent;
   user?: PopulatedUser;
 };
@@ -90,6 +97,14 @@ function formatRegistrationResponse(registration: RegistrationDoc): Registration
   if (registration.paymentStatus !== undefined) response.paymentStatus = registration.paymentStatus;
   if (registration.paymentId !== undefined) response.paymentId = registration.paymentId;
   if (registration.finalPrice !== undefined) response.finalPrice = registration.finalPrice;
+  if (registration.distanceId !== undefined) response.distanceId = registration.distanceId;
+  if (registration.distanceLabel !== undefined) response.distanceLabel = registration.distanceLabel;
+  if (registration.shirtSize !== undefined) response.shirtSize = registration.shirtSize;
+  if (registration.estimatedPace !== undefined) response.estimatedPace = registration.estimatedPace;
+  if (registration.afuDonation !== undefined) response.afuDonation = registration.afuDonation;
+  if (registration.bib !== undefined) response.bib = registration.bib;
+  if (registration.kidsRegistrations !== undefined)
+    response.kidsRegistrations = registration.kidsRegistrations;
 
   return response;
 }
@@ -252,7 +267,22 @@ export async function createRegistration(
 export async function createPublicRegistration(
   input: CreatePublicRegistrationInput
 ): Promise<{ registration: RegistrationResponse; paymentLink?: string }> {
-  const { eventId, name, surname, email, city, runningClub, phone, promoCode } = input;
+  const {
+    eventId,
+    name,
+    surname,
+    email,
+    city,
+    runningClub,
+    phone,
+    promoCode,
+    distanceId,
+    distanceLabel,
+    shirtSize,
+    estimatedPace,
+    afuDonation,
+    kidsRegistrations,
+  } = input;
   const resolvedEventId = resolveEventId(eventId);
 
   const session = await mongoose.startSession();
@@ -529,6 +559,12 @@ export async function createPublicRegistration(
           paymentStatus: isFreeRegistration ? 'completed' : 'pending',
           registeredAt: new Date(),
           finalPrice,
+          distanceId,
+          distanceLabel,
+          shirtSize,
+          estimatedPace,
+          afuDonation,
+          kidsRegistrations,
         },
       ],
       { session }
@@ -976,7 +1012,7 @@ export async function getPublicParticipants(eventId: string): Promise<PublicPart
     eventId: resolvedEventId,
     status: 'confirmed',
   })
-    .select('name surname city runningClub registeredAt')
+    .select('name surname city runningClub registeredAt bib distanceLabel')
     .sort({ registeredAt: -1 })
     .lean();
 
@@ -989,6 +1025,9 @@ export async function getPublicParticipants(eventId: string): Promise<PublicPart
     if (participant.surname !== undefined) record.surname = participant.surname;
     if (participant.city !== undefined) record.city = participant.city;
     if (participant.runningClub !== undefined) record.runningClub = participant.runningClub;
+    record.bib = (participant as { bib?: string }).bib ?? null;
+    const dl = (participant as { distanceLabel?: string }).distanceLabel;
+    if (dl !== undefined) record.distance = dl;
     return record;
   });
 }

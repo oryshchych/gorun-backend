@@ -4,14 +4,25 @@ import { IUser } from '../../models/User';
 import { RefreshToken } from '../../models/RefreshToken';
 import { expiryToDate } from '../../utils/time.util';
 import { generateRefreshToken } from '../../utils/jwt.util';
-import type { ProfileGender, UserResponse } from './auth.types';
+import type { KidProfileResponse, ProfileGender, UserResponse } from './auth.types';
 
-export function formatUserResponse(user: IUser): UserResponse {
+export function formatUserResponse(
+  user: IUser,
+  stats: { totalKm: number; totalDonated: number } = { totalKm: 0, totalDonated: 0 }
+): UserResponse {
   const parts = (user.name || '').trim().split(/\s+/).filter(Boolean);
   const derivedFirst = (user.firstName?.trim() || parts[0] || '').trim() || null;
   const derivedLast =
     (user.lastName?.trim() || (parts.length > 1 ? parts.slice(1).join(' ') : '') || '').trim() ||
     null;
+
+  const kids: KidProfileResponse[] = (user.kids ?? []).map(k => {
+    const kid: KidProfileResponse = { name: k.name };
+    if (k.id !== undefined) kid.id = k.id;
+    if (k.age !== undefined) kid.age = k.age;
+    if (k.shirtSize !== undefined) kid.shirtSize = k.shirtSize;
+    return kid;
+  });
 
   return {
     id: user._id.toString(),
@@ -32,6 +43,9 @@ export function formatUserResponse(user: IUser): UserResponse {
     providerId: user.providerId ?? null,
     isAdmin: Boolean(user.isAdmin),
     adminRole: user.isAdmin && user.adminRole ? user.adminRole : null,
+    kids,
+    totalKm: stats.totalKm,
+    totalDonated: stats.totalDonated,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };

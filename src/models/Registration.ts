@@ -1,5 +1,14 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
+export interface KidRegistration {
+  kidId?: string;
+  name: string;
+  age: number;
+  distanceId: string;
+  distanceLabel: string;
+  shirtSize?: string;
+}
+
 export interface IRegistration extends Document {
   _id: mongoose.Types.ObjectId;
   eventId: mongoose.Types.ObjectId;
@@ -17,6 +26,13 @@ export interface IRegistration extends Document {
   paymentStatus: 'pending' | 'completed' | 'failed';
   paymentId?: string;
   finalPrice?: number;
+  distanceId?: string;
+  distanceLabel?: string;
+  shirtSize?: string;
+  estimatedPace?: string;
+  afuDonation?: number;
+  bib?: string;
+  kidsRegistrations?: KidRegistration[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -113,6 +129,25 @@ const registrationSchema = new Schema<IRegistration>(
     finalPrice: {
       type: Number,
       min: [0, 'Final price cannot be negative'],
+    },
+    distanceId: { type: String, trim: true },
+    distanceLabel: { type: String, trim: true },
+    shirtSize: { type: String, trim: true },
+    estimatedPace: { type: String, trim: true },
+    afuDonation: { type: Number, min: 0 },
+    bib: { type: String, trim: true },
+    kidsRegistrations: {
+      type: [
+        {
+          kidId: { type: String },
+          name: { type: String, required: true, trim: true },
+          age: { type: Number, required: true },
+          distanceId: { type: String, required: true, trim: true },
+          distanceLabel: { type: String, required: true, trim: true },
+          shirtSize: { type: String, trim: true },
+        },
+      ],
+      default: undefined,
     },
   },
   {

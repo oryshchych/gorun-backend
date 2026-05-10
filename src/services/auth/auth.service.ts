@@ -2,6 +2,7 @@ import { authFlowConfig, frontendConfig } from '../../config/env';
 import { logger } from '../../config/logger';
 import { PasswordResetToken } from '../../models/PasswordResetToken';
 import { RefreshToken } from '../../models/RefreshToken';
+import { Registration } from '../../models/Registration';
 import { User } from '../../models/User';
 import { AUTH_CODES, VALIDATION_CODES } from '../../types/codes';
 import {
@@ -189,6 +190,23 @@ export async function logout(refreshTokenString: string): Promise<void> {
   }
 }
 
+async function computeUserStats(
+  userId: string
+): Promise<{ totalKm: number; totalDonated: number }> {
+  const regs = await Registration.find({ userId, status: 'confirmed' })
+    .select('afuDonation distanceId')
+    .lean();
+
+  let totalDonated = 0;
+  for (const r of regs) {
+    if ((r as { afuDonation?: number }).afuDonation) {
+      totalDonated += (r as { afuDonation?: number }).afuDonation ?? 0;
+    }
+  }
+
+  return { totalKm: 0, totalDonated };
+}
+
 export async function getCurrentUser(userId: string): Promise<UserResponse> {
   const user = await User.findById(userId);
 
@@ -196,7 +214,8 @@ export async function getCurrentUser(userId: string): Promise<UserResponse> {
     throw new NotFoundError('User not found', AUTH_CODES.ERROR_AUTH_USER_NOT_FOUND);
   }
 
-  return formatUserResponse(user);
+  const stats = await computeUserStats(userId);
+  return formatUserResponse(user, stats);
 }
 
 /**
@@ -254,8 +273,13 @@ export async function updateProfile(
     }
   }
 
+  if ('kids' in patch && patch.kids !== undefined) {
+    (user as unknown as Record<string, unknown>).kids = patch.kids;
+  }
+
   await user.save();
-  return formatUserResponse(user);
+  const stats = await computeUserStats(userId);
+  return formatUserResponse(user, stats);
 }
 
 /**

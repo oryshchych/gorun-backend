@@ -128,6 +128,13 @@ const nullableTrimmedString = (max: number, label: string) =>
       .min(1, { message: `${label} cannot be empty` }),
   ]);
 
+const kidProfileSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().trim().min(1).max(100),
+  age: z.number().int().min(0).max(17).optional(),
+  shirtSize: z.string().trim().optional(),
+});
+
 /** Partial profile update; null clears a field. Omit keys you do not change. */
 export const updateProfileSchema = z
   .object({
@@ -141,8 +148,8 @@ export const updateProfileSchema = z
     runningClub: nullableTrimmedString(200, 'Running club').optional(),
     city: nullableTrimmedString(100, 'City').optional(),
     deliveryAddress: nullableTrimmedString(2000, 'Delivery address').optional(),
+    kids: z.array(kidProfileSchema).optional(),
   })
-  .strict()
   .superRefine((data, ctx) => {
     if (!data.dateOfBirth || data.dateOfBirth === null) return;
     const s = data.dateOfBirth;

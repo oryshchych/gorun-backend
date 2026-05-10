@@ -7,6 +7,13 @@ export type UserGender = (typeof USER_GENDER_VALUES)[number];
 export const USER_ADMIN_ROLES = ['admin', 'super_admin'] as const;
 export type UserAdminRole = (typeof USER_ADMIN_ROLES)[number];
 
+export interface KidProfile {
+  id?: string;
+  name: string;
+  age?: number;
+  shirtSize?: string;
+}
+
 export interface IUser extends Document {
   _id: mongoose.Types.ObjectId;
   name: string;
@@ -28,6 +35,7 @@ export interface IUser extends Document {
   deliveryAddress?: string;
   isAdmin: boolean;
   adminRole?: UserAdminRole;
+  kids?: KidProfile[];
   createdAt: Date;
   updatedAt: Date;
   comparePassword(password: string): Promise<boolean>;
@@ -126,6 +134,17 @@ const userSchema = new Schema<IUser>(
     adminRole: {
       type: String,
       enum: USER_ADMIN_ROLES,
+    },
+    kids: {
+      type: [
+        {
+          id: { type: String },
+          name: { type: String, required: true, trim: true, maxlength: 100 },
+          age: { type: Number, min: 0, max: 17 },
+          shirtSize: { type: String, trim: true },
+        },
+      ],
+      default: undefined,
     },
   },
   {

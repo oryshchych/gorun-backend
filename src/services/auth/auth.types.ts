@@ -1,5 +1,12 @@
 export type ProfileGender = 'female' | 'male' | 'other' | 'prefer_not_to_say';
 
+export interface KidProfileResponse {
+  id?: string;
+  name: string;
+  age?: number;
+  shirtSize?: string;
+}
+
 export interface RegisterInput {
   firstName?: string;
   lastName?: string;
@@ -36,6 +43,11 @@ export interface UserResponse {
   providerId: string | null;
   isAdmin: boolean;
   adminRole: 'admin' | 'super_admin' | null;
+  kids: KidProfileResponse[];
+  /** Sum of km across all confirmed registrations (computed on-the-fly). */
+  totalKm: number;
+  /** Sum of afuDonation across all confirmed registrations (computed on-the-fly). */
+  totalDonated: number;
   createdAt: Date;
   updatedAt: Date;
 }
