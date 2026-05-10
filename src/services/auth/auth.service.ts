@@ -1,5 +1,6 @@
 import { authFlowConfig, frontendConfig } from '../../config/env';
 import { logger } from '../../config/logger';
+import { Event } from '../../models/Event';
 import { PasswordResetToken } from '../../models/PasswordResetToken';
 import { RefreshToken } from '../../models/RefreshToken';
 import { Registration } from '../../models/Registration';
@@ -190,21 +191,54 @@ export async function logout(refreshTokenString: string): Promise<void> {
   }
 }
 
+/**
+ * Aggregated profile stats for the runner: km logged across confirmed
+ * registrations and total UAH donated to the AFU.
+ *
+ * `totalKm` joins each registration's event by `distanceId` to find the
+ * distance.km. Falls back to 0 when the event/distance can't be resolved.
+ */
 async function computeUserStats(
   userId: string
 ): Promise<{ totalKm: number; totalDonated: number }> {
   const regs = await Registration.find({ userId, status: 'confirmed' })
-    .select('afuDonation distanceId')
+    .select('afuDonation distanceId eventId')
     .lean();
 
   let totalDonated = 0;
+  const eventIds = new Set<string>();
   for (const r of regs) {
-    if ((r as { afuDonation?: number }).afuDonation) {
-      totalDonated += (r as { afuDonation?: number }).afuDonation ?? 0;
+    const reg = r as { afuDonation?: number; eventId?: { toString(): string } };
+    if (reg.afuDonation) totalDonated += reg.afuDonation;
+    if (reg.eventId) eventIds.add(reg.eventId.toString());
+  }
+
+  let totalKm = 0;
+  if (eventIds.size > 0) {
+    const events = await Event.find({ _id: { $in: Array.from(eventIds) } })
+      .select('distances')
+      .lean();
+    const kmByEventDistance = new Map<string, number>();
+    for (const ev of events) {
+      const eid = (ev as { _id: { toString(): string } })._id.toString();
+      const distances = (ev as { distances?: Array<{ id?: string; km?: number }> }).distances ?? [];
+      for (const d of distances) {
+        if (d.id && typeof d.km === 'number') {
+          kmByEventDistance.set(`${eid}:${d.id}`, d.km);
+        }
+      }
+    }
+    for (const r of regs) {
+      const reg = r as { distanceId?: string; eventId?: { toString(): string } };
+      if (reg.distanceId && reg.eventId) {
+        const key = `${reg.eventId.toString()}:${reg.distanceId}`;
+        const km = kmByEventDistance.get(key);
+        if (typeof km === 'number') totalKm += km;
+      }
     }
   }
 
-  return { totalKm: 0, totalDonated };
+  return { totalKm, totalDonated };
 }
 
 export async function getCurrentUser(userId: string): Promise<UserResponse> {

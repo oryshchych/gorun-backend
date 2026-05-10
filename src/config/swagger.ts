@@ -388,14 +388,26 @@ const options: swaggerJsdoc.Options = {
         Distance: {
           type: 'object',
           properties: {
-            id: { type: 'string' },
-            label: { type: 'string', example: '10K' },
-            name: { type: 'string', example: '10 Kilometres' },
-            km: { type: 'number', example: 10 },
-            feeUah: { type: 'number', example: 500 },
-            elevation: { type: 'number', example: 200 },
-            laps: { type: 'integer', example: 1 },
-            spots: { type: 'integer', example: 200 },
+            id: { type: 'string', example: '21k' },
+            label: { type: 'string', example: '21K' },
+            name: { type: 'string', example: 'Half Marathon' },
+            km: { type: 'number', example: 21.097 },
+            feeUah: { type: 'number', example: 800 },
+            elevation: {
+              type: 'string',
+              description: 'Human-readable elevation gain, e.g. "+420m"',
+              example: '+420m',
+            },
+            laps: {
+              type: 'integer',
+              nullable: true,
+              description: 'Number of laps; null when not applicable.',
+              example: null,
+            },
+            spots: {
+              $ref: '#/components/schemas/Spots',
+              description: 'Per-distance taken/total counter.',
+            },
           },
         },
         KidsDistance: {
@@ -522,7 +534,39 @@ const options: swaggerJsdoc.Options = {
                     },
                   },
                 },
+                pastDescription: {
+                  $ref: '#/components/schemas/TranslationField',
+                  description:
+                    'Post-race recap shown on finished events. Resolves to `resolvedPastDescription` when ?lang= is sent.',
+                },
               },
+            },
+            resolvedTitle: {
+              type: 'string',
+              description:
+                'Title resolved by ?lang= query parameter. Present only when lang is supplied.',
+            },
+            resolvedDescription: {
+              type: 'string',
+              description: 'Description resolved by ?lang= query parameter.',
+            },
+            resolvedLocation: {
+              type: 'string',
+              description: 'Location resolved by ?lang= query parameter.',
+            },
+            resolvedSpeakers: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Speaker names resolved by ?lang= query parameter.',
+            },
+            resolvedDate: {
+              type: 'string',
+              description: 'Display date string resolved by ?lang= query parameter.',
+            },
+            resolvedPastDescription: {
+              type: 'string',
+              description:
+                'Post-race recap resolved by ?lang= query parameter. Present only when set on the event.',
             },
             imageUrl: {
               type: 'object',
@@ -594,6 +638,8 @@ const options: swaggerJsdoc.Options = {
         CreateEventInput: {
           type: 'object',
           required: ['translations', 'date', 'capacity'],
+          description:
+            'Send `status` (UPCOMING|LIVE|FINISHED|CANCELLED) and/or `lifecyclePhase`. If only one is provided the server mirrors the other: UPCOMING/CANCELLED→FUTURE, LIVE→CURRENT, FINISHED→FINISHED, PLANNED/FUTURE→UPCOMING, CURRENT→LIVE.',
           properties: {
             translations: {
               type: 'object',
@@ -641,6 +687,14 @@ const options: swaggerJsdoc.Options = {
                       uk: { type: 'string' },
                       imageUrl: { type: 'string', format: 'uri' },
                     },
+                  },
+                },
+                pastDescription: {
+                  type: 'object',
+                  description: 'Post-race recap shown on finished events.',
+                  properties: {
+                    en: { type: 'string' },
+                    uk: { type: 'string' },
                   },
                 },
               },
@@ -709,7 +763,7 @@ const options: swaggerJsdoc.Options = {
         UpdateEventInput: {
           type: 'object',
           description:
-            'All fields optional. Admin sends full form payload; omitted arrays are preserved as-is.',
+            'Partial update. All fields optional; omitted keys leave existing values untouched (no clearing). The server mirrors `status` ↔ `lifecyclePhase` when only one is supplied (see CreateEventInput for the mapping). Per-locale translation keys are merged so updating only one language preserves the other.',
           properties: {
             translations: {
               type: 'object',
@@ -751,6 +805,15 @@ const options: swaggerJsdoc.Options = {
                       uk: { type: 'string' },
                       imageUrl: { type: 'string', format: 'uri' },
                     },
+                  },
+                },
+                pastDescription: {
+                  type: 'object',
+                  description:
+                    'Post-race recap. Per-locale partial merge — sending only one language preserves the other.',
+                  properties: {
+                    en: { type: 'string' },
+                    uk: { type: 'string' },
                   },
                 },
               },

@@ -97,6 +97,12 @@ const translationsSchema = z.object({
       })
     )
     .optional(),
+  pastDescription: z
+    .object({
+      en: z.string().trim().optional(),
+      uk: z.string().trim().optional(),
+    })
+    .optional(),
 });
 
 const distanceSpotsSchema = z.object({

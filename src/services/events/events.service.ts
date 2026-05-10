@@ -35,6 +35,7 @@ type EventDoc = {
         speakers?: Array<{ en?: string; uk?: string }>;
         partners?: Array<{ en?: string; uk?: string; imageUrl?: string }>;
         date?: { en?: string; uk?: string };
+        pastDescription?: { en?: string; uk?: string };
       }
     | undefined;
   title: string;
@@ -127,6 +128,9 @@ function buildTranslations(event: {
   if (t.partners !== undefined) {
     translations.partners = t.partners;
   }
+  if (t.pastDescription !== undefined) {
+    translations.pastDescription = t.pastDescription;
+  }
   return translations;
 }
 
@@ -139,6 +143,7 @@ function resolveByLang(
   location?: string;
   speakers?: string[];
   date?: string;
+  pastDescription?: string;
 } {
   const pick = (en?: string, uk?: string) => {
     if (lang === 'uk' && uk && uk.trim().length > 0) return uk;
@@ -154,16 +159,19 @@ function resolveByLang(
     location?: string;
     speakers?: string[];
     date?: string;
+    pastDescription?: string;
   } = {};
   const title = pick(translations.title?.en, translations.title?.uk);
   const description = pick(translations.description?.en, translations.description?.uk);
   const location = pick(translations.location?.en, translations.location?.uk);
   const date = pick(translations.date?.en, translations.date?.uk);
+  const pastDescription = pick(translations.pastDescription?.en, translations.pastDescription?.uk);
   if (title !== undefined) result.title = title;
   if (description !== undefined) result.description = description;
   if (location !== undefined) result.location = location;
   if (speakers !== undefined) result.speakers = speakers;
   if (date !== undefined) result.date = date;
+  if (pastDescription !== undefined) result.pastDescription = pastDescription;
   return result;
 }
 
@@ -188,6 +196,9 @@ function formatEventResponse(event: EventDoc, lang?: 'en' | 'uk'): EventResponse
   if (resolved.location !== undefined) response.resolvedLocation = resolved.location;
   if (resolved.speakers !== undefined) response.resolvedSpeakers = resolved.speakers;
   if (resolved.date !== undefined) response.resolvedDate = resolved.date;
+  if (resolved.pastDescription !== undefined) {
+    response.resolvedPastDescription = resolved.pastDescription;
+  }
   if (event.lifecyclePhase !== undefined) response.lifecyclePhase = event.lifecyclePhase;
   if (event.status !== undefined) response.status = event.status;
   if (event.slug !== undefined) response.slug = event.slug;
@@ -296,6 +307,16 @@ function mergeTranslationsForUpdate(
   } else if (currentTranslations.partners !== undefined) {
     mergedTranslations.partners = currentTranslations.partners;
   }
+  // Per-locale merge so updating only one language doesn't drop the other.
+  if (
+    input.translations?.pastDescription !== undefined ||
+    currentTranslations.pastDescription !== undefined
+  ) {
+    mergedTranslations.pastDescription = {
+      ...(currentTranslations.pastDescription ?? {}),
+      ...(input.translations?.pastDescription ?? {}),
+    };
+  }
 
   const legacyTitle = input.title ?? mergedTranslations.title?.en ?? existing.title;
   const legacyDescription =
@@ -315,8 +336,13 @@ function mergeTranslationsForUpdate(
   if (input.date !== undefined) updateFields.date = input.date;
   if (input.capacity !== undefined) updateFields.capacity = input.capacity;
   if (input.isActive !== undefined) updateFields.isActive = input.isActive;
-  if (input.lifecyclePhase !== undefined) updateFields.lifecyclePhase = input.lifecyclePhase;
-  if (input.status !== undefined) updateFields.status = input.status;
+  // Mirror status ↔ lifecyclePhase so admin clients sending only one stay consistent.
+  const derived = deriveStatusAndPhase({
+    status: input.status,
+    lifecyclePhase: input.lifecyclePhase,
+  });
+  if (derived.lifecyclePhase !== undefined) updateFields.lifecyclePhase = derived.lifecyclePhase;
+  if (derived.status !== undefined) updateFields.status = derived.status;
   if (input.slug !== undefined) updateFields.slug = input.slug;
   if (input.shortDesc !== undefined) updateFields.shortDesc = input.shortDesc;
   if (input.city !== undefined) updateFields.city = input.city;
@@ -344,6 +370,35 @@ function mergeTranslationsForUpdate(
   if (input.map !== undefined) updateFields.map = input.map;
 
   return { updateFields };
+}
+
+/**
+ * Mirror status ↔ lifecyclePhase per the agreed mapping (see frontend redesign §9).
+ * If only one of the two fields is supplied, derive the other so all clients stay
+ * consistent. Both being explicitly provided wins.
+ */
+function deriveStatusAndPhase<
+  T extends { status?: IEvent['status']; lifecyclePhase?: IEvent['lifecyclePhase'] },
+>(input: T): T {
+  const statusToPhase: Record<NonNullable<IEvent['status']>, IEvent['lifecyclePhase']> = {
+    UPCOMING: 'FUTURE',
+    LIVE: 'CURRENT',
+    FINISHED: 'FINISHED',
+    CANCELLED: 'FUTURE',
+  };
+  const phaseToStatus: Record<NonNullable<IEvent['lifecyclePhase']>, IEvent['status']> = {
+    PLANNED: 'UPCOMING',
+    FUTURE: 'UPCOMING',
+    CURRENT: 'LIVE',
+    FINISHED: 'FINISHED',
+  };
+  const out = { ...input };
+  if (out.status && !out.lifecyclePhase) {
+    out.lifecyclePhase = statusToPhase[out.status];
+  } else if (out.lifecyclePhase && !out.status) {
+    out.status = phaseToStatus[out.lifecyclePhase];
+  }
+  return out;
 }
 
 /**
@@ -465,6 +520,10 @@ export async function createEvent(
   }
 
   const normalized = normalizeTranslationsForWrite(input);
+  const { status, lifecyclePhase } = deriveStatusAndPhase({
+    status: input.status,
+    lifecyclePhase: input.lifecyclePhase,
+  });
 
   const event = await Event.create({
     translations: normalized.translations,
@@ -475,8 +534,8 @@ export async function createEvent(
     date: input.date,
     capacity: input.capacity,
     isActive: input.isActive ?? true,
-    lifecyclePhase: input.lifecyclePhase,
-    status: input.status,
+    lifecyclePhase,
+    status,
     slug: input.slug,
     shortDesc: input.shortDesc,
     city: input.city,

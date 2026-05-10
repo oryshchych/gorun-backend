@@ -71,6 +71,8 @@ export interface IEvent extends Document {
     speakers?: Array<{ en?: string; uk?: string }>;
     date?: { en?: string; uk?: string };
     partners?: Array<{ en?: string; uk?: string; imageUrl?: string }>;
+    /** Post-race recap shown on finished events; resolves to `resolvedPastDescription` when ?lang= is sent. */
+    pastDescription?: { en?: string; uk?: string };
   };
   title: string;
   description: string;
@@ -160,6 +162,10 @@ const eventSchema = new Schema<IEvent>(
             },
           },
         ],
+        pastDescription: {
+          en: { type: String, trim: true },
+          uk: { type: String, trim: true },
+        },
       },
       default: undefined,
     },

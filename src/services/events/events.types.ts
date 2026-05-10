@@ -18,6 +18,8 @@ export type TranslationFields = {
   speakers?: Array<{ en?: string; uk?: string }>;
   date?: { en?: string; uk?: string };
   partners?: Array<{ en?: string; uk?: string; imageUrl?: string }>;
+  /** Post-race recap, shown on finished events. Resolved as `resolvedPastDescription`. */
+  pastDescription?: { en?: string; uk?: string };
 };
 
 export interface CreateEventInput {
@@ -160,4 +162,6 @@ export interface EventResponse {
   resolvedLocation?: string;
   resolvedSpeakers?: string[];
   resolvedDate?: string;
+  /** Post-race recap resolved by `lang` query parameter. */
+  resolvedPastDescription?: string;
 }
