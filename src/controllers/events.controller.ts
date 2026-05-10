@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import type { z } from 'zod';
 import { AuthRequest } from '../middleware/auth.middleware';
-import eventsService, { UpdateEventInput } from '../services/events/events.service';
+import eventsService, { EventFilters, UpdateEventInput } from '../services/events/events.service';
 import { getEventsQuerySchema } from '../validators/events.validator';
 
 type GetEventsQuery = z.infer<typeof getEventsQuerySchema>;
@@ -38,24 +38,22 @@ export const getSingleEvent = async (_req: Request, res: Response): Promise<void
  * Get all events with filters and pagination
  * GET /api/events
  */
-export const getEvents = async (req: Request, res: Response): Promise<void> => {
+export const getEvents = async (req: AuthRequest, res: Response): Promise<void> => {
   const q = req.validatedQuery as GetEventsQuery;
-  const { search, startDate, endDate, location, page, limit } = q;
+  const { search, startDate, endDate, location, page, limit, status, lifecyclePhase, isActive } = q;
   const lang = getRequestedLang(req);
+  const isAdmin = req.user?.isAdmin ?? false;
 
-  // Build filters object, only including defined values
-  const filters: {
-    search?: string;
-    startDate?: Date;
-    endDate?: Date;
-    location?: string;
-  } = {};
+  const filters: EventFilters = {};
   if (search) filters.search = search;
   if (startDate) filters.startDate = startDate;
   if (endDate) filters.endDate = endDate;
   if (location) filters.location = location;
+  if (status) filters.status = status;
+  if (lifecyclePhase) filters.lifecyclePhase = lifecyclePhase;
+  if (isActive !== undefined) filters.isActive = isActive;
 
-  const result = await eventsService.getEvents(filters, page, limit, lang);
+  const result = await eventsService.getEvents(filters, page, limit, lang, isAdmin);
 
   res.status(200).json({
     success: true,
@@ -68,9 +66,10 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
  * Get event by ID
  * GET /api/events/:id
  */
-export const getEventById = async (req: Request, res: Response): Promise<void> => {
+export const getEventById = async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.validatedParams as { id: string };
   const lang = getRequestedLang(req);
+  const isAdmin = req.user?.isAdmin ?? false;
 
   if (!id) {
     res.status(400).json({
@@ -80,7 +79,7 @@ export const getEventById = async (req: Request, res: Response): Promise<void> =
     return;
   }
 
-  const event = await eventsService.getEventById(id, lang);
+  const event = await eventsService.getEventById(id, lang, isAdmin);
 
   res.status(200).json({
     success: true,
@@ -94,6 +93,7 @@ export const getEventById = async (req: Request, res: Response): Promise<void> =
  */
 export const createEvent = async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user!.userId;
+  const isAdmin = req.user?.isAdmin ?? false;
   const {
     translations,
     title,
@@ -101,24 +101,66 @@ export const createEvent = async (req: AuthRequest, res: Response): Promise<void
     date,
     location,
     capacity,
+    isActive,
+    lifecyclePhase,
+    status,
+    slug,
+    shortDesc,
+    city,
+    venue,
+    dateLabel,
+    timeLabel,
+    cover,
+    fee,
+    afu,
+    perks,
+    spots,
     imageUrl,
     basePrice,
     speakers,
     gallery,
+    distances,
+    kidsDistances,
+    schedule,
+    program,
+    map,
   } = req.body;
 
-  const event = await eventsService.createEvent(userId, {
-    translations,
-    title,
-    description,
-    date: new Date(date),
-    location,
-    capacity,
-    imageUrl,
-    basePrice,
-    speakers,
-    gallery,
-  });
+  const event = await eventsService.createEvent(
+    userId,
+    {
+      translations,
+      title,
+      description,
+      date: new Date(date),
+      location,
+      capacity,
+      isActive,
+      lifecyclePhase,
+      status,
+      slug,
+      shortDesc,
+      city,
+      venue,
+      dateLabel,
+      timeLabel,
+      cover,
+      fee,
+      afu,
+      perks,
+      spots,
+      imageUrl,
+      basePrice,
+      speakers,
+      gallery,
+      distances,
+      kidsDistances,
+      schedule,
+      program,
+      map,
+    },
+    isAdmin
+  );
 
   res.status(201).json({
     success: true,
@@ -133,6 +175,7 @@ export const createEvent = async (req: AuthRequest, res: Response): Promise<void
 export const updateEvent = async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.validatedParams as { id: string };
   const userId = req.user!.userId;
+  const isAdmin = req.user?.isAdmin ?? false;
   const {
     translations,
     title,
@@ -140,10 +183,29 @@ export const updateEvent = async (req: AuthRequest, res: Response): Promise<void
     date,
     location,
     capacity,
+    isActive,
+    lifecyclePhase,
+    status,
+    slug,
+    shortDesc,
+    city,
+    venue,
+    dateLabel,
+    timeLabel,
+    cover,
+    fee,
+    afu,
+    perks,
+    spots,
     imageUrl,
     basePrice,
     speakers,
     gallery,
+    distances,
+    kidsDistances,
+    schedule,
+    program,
+    map,
   } = req.body;
 
   if (!id) {
@@ -161,12 +223,31 @@ export const updateEvent = async (req: AuthRequest, res: Response): Promise<void
   if (date !== undefined) updateData.date = new Date(date);
   if (location !== undefined) updateData.location = location;
   if (capacity !== undefined) updateData.capacity = capacity;
+  if (isActive !== undefined) updateData.isActive = isActive;
+  if (lifecyclePhase !== undefined) updateData.lifecyclePhase = lifecyclePhase;
+  if (status !== undefined) updateData.status = status;
+  if (slug !== undefined) updateData.slug = slug;
+  if (shortDesc !== undefined) updateData.shortDesc = shortDesc;
+  if (city !== undefined) updateData.city = city;
+  if (venue !== undefined) updateData.venue = venue;
+  if (dateLabel !== undefined) updateData.dateLabel = dateLabel;
+  if (timeLabel !== undefined) updateData.timeLabel = timeLabel;
+  if (cover !== undefined) updateData.cover = cover;
+  if (fee !== undefined) updateData.fee = fee;
+  if (afu !== undefined) updateData.afu = afu;
+  if (perks !== undefined) updateData.perks = perks;
+  if (spots !== undefined) updateData.spots = spots;
   if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
   if (basePrice !== undefined) updateData.basePrice = basePrice;
   if (speakers !== undefined) updateData.speakers = speakers;
   if (gallery !== undefined) updateData.gallery = gallery;
+  if (distances !== undefined) updateData.distances = distances;
+  if (kidsDistances !== undefined) updateData.kidsDistances = kidsDistances;
+  if (schedule !== undefined) updateData.schedule = schedule;
+  if (program !== undefined) updateData.program = program;
+  if (map !== undefined) updateData.map = map;
 
-  const event = await eventsService.updateEvent(id, userId, updateData);
+  const event = await eventsService.updateEvent(id, userId, updateData, isAdmin);
 
   res.status(200).json({
     success: true,
@@ -181,6 +262,7 @@ export const updateEvent = async (req: AuthRequest, res: Response): Promise<void
 export const deleteEvent = async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.validatedParams as { id: string };
   const userId = req.user!.userId;
+  const isAdmin = req.user?.isAdmin ?? false;
 
   if (!id) {
     res.status(400).json({
@@ -190,7 +272,7 @@ export const deleteEvent = async (req: AuthRequest, res: Response): Promise<void
     return;
   }
 
-  await eventsService.deleteEvent(id, userId);
+  await eventsService.deleteEvent(id, userId, isAdmin);
 
   res.status(204).send();
 };

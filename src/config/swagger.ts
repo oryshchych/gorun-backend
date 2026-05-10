@@ -355,6 +355,54 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        EventStatus: {
+          type: 'string',
+          enum: ['UPCOMING', 'LIVE', 'FINISHED', 'CANCELLED'],
+          description: 'Legacy status used by the home page and public filters',
+        },
+        EventLifecyclePhase: {
+          type: 'string',
+          enum: ['PLANNED', 'FUTURE', 'CURRENT', 'FINISHED'],
+          description: 'Admin lifecycle phase for editorial workflow',
+        },
+        Distance: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            label: { type: 'string', example: '10K' },
+            name: { type: 'string', example: '10 Kilometres' },
+            km: { type: 'number', example: 10 },
+            feeUah: { type: 'number', example: 500 },
+            elevation: { type: 'number', example: 200 },
+            laps: { type: 'integer', example: 1 },
+            spots: { type: 'integer', example: 200 },
+          },
+        },
+        KidsDistance: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            label: { type: 'string', example: 'Kids 1K' },
+            name: { type: 'string', example: '1 Kilometre for Kids' },
+            age: { type: 'string', example: '6-12' },
+            feeUah: { type: 'number', example: 100 },
+          },
+        },
+        ScheduleItem: {
+          type: 'object',
+          required: ['time', 'what'],
+          properties: {
+            time: { type: 'string', example: '08:00' },
+            what: { type: 'string', example: 'Registration & bib pickup' },
+          },
+        },
+        Spots: {
+          type: 'object',
+          properties: {
+            taken: { type: 'integer', minimum: 0, example: 120 },
+            total: { type: 'integer', minimum: 0, example: 500 },
+          },
+        },
         Event: {
           type: 'object',
           properties: {
@@ -363,26 +411,52 @@ const options: swaggerJsdoc.Options = {
               description: 'Event ID',
               example: '507f1f77bcf86cd799439011',
             },
+            isActive: {
+              type: 'boolean',
+              description: 'If false the event is hidden from public listings',
+              example: true,
+            },
+            lifecyclePhase: {
+              $ref: '#/components/schemas/EventLifecyclePhase',
+            },
+            status: {
+              $ref: '#/components/schemas/EventStatus',
+            },
+            slug: { type: 'string', example: 'kyiv-run-2025' },
+            shortDesc: { type: 'string', example: 'The biggest city race of the year' },
+            city: { type: 'string', example: 'Kyiv' },
+            venue: { type: 'string', example: 'Olympic Stadium' },
+            dateLabel: { type: 'string', example: '15 December 2025' },
+            timeLabel: { type: 'string', example: '08:00 – 14:00' },
+            cover: { type: 'string', format: 'uri', example: 'https://cdn.example.com/cover.jpg' },
+            fee: { type: 'string', example: '500 UAH' },
+            afu: { type: 'string', example: 'AFU member discount applies' },
+            perks: {
+              type: 'array',
+              items: { type: 'string' },
+              example: ['Medal', 'T-Shirt', 'Finisher Certificate'],
+            },
+            spots: { $ref: '#/components/schemas/Spots' },
             title: {
               type: 'string',
-              description: 'Event title',
-              example: 'Tech Conference 2024',
+              description: 'Legacy title (EN fallback)',
+              example: 'Kyiv City Run 2025',
             },
             description: {
               type: 'string',
-              description: 'Event description',
-              example: 'Annual technology conference featuring industry leaders',
+              description: 'Legacy description (EN fallback)',
+              example: 'Annual city running race in the heart of Kyiv',
             },
             date: {
               type: 'string',
               format: 'date-time',
-              description: 'Event date and time',
-              example: '2024-12-15T10:00:00.000Z',
+              description: 'Event date and time (ISO 8601)',
+              example: '2025-12-15T08:00:00.000Z',
             },
             location: {
               type: 'string',
-              description: 'Event location',
-              example: 'San Francisco Convention Center',
+              description: 'Legacy location string',
+              example: 'Kyiv, Ukraine',
             },
             capacity: {
               type: 'integer',
@@ -406,48 +480,25 @@ const options: swaggerJsdoc.Options = {
             },
             translations: {
               type: 'object',
-              description: 'Multilingual translations for event fields',
+              description:
+                'Bilingual translations. All language keys present when lang is omitted (admin). Only the requested locale is present when lang=en|uk.',
               properties: {
-                title: {
-                  $ref: '#/components/schemas/TranslationField',
-                },
-                description: {
-                  $ref: '#/components/schemas/TranslationField',
-                },
-                location: {
-                  $ref: '#/components/schemas/TranslationField',
-                },
+                title: { $ref: '#/components/schemas/TranslationField' },
+                description: { $ref: '#/components/schemas/TranslationField' },
+                location: { $ref: '#/components/schemas/TranslationField' },
+                date: { $ref: '#/components/schemas/TranslationField' },
                 speakers: {
                   type: 'array',
-                  items: {
-                    $ref: '#/components/schemas/TranslationField',
-                  },
-                },
-                date: {
-                  $ref: '#/components/schemas/TranslationField',
+                  items: { $ref: '#/components/schemas/TranslationField' },
                 },
                 partners: {
                   type: 'array',
-                  description: 'Event partners with translations and images',
                   items: {
                     type: 'object',
                     properties: {
-                      en: {
-                        type: 'string',
-                        description: 'Partner name in English (optional)',
-                        example: 'Tech Sponsor Inc.',
-                      },
-                      uk: {
-                        type: 'string',
-                        description: 'Partner name in Ukrainian (optional)',
-                        example: 'Тех Спонсор Інк.',
-                      },
-                      imageUrl: {
-                        type: 'string',
-                        format: 'uri',
-                        description: 'Partner logo/image URL (optional)',
-                        example: 'https://example.com/partner-logo.jpg',
-                      },
+                      en: { type: 'string', example: 'Tech Sponsor Inc.' },
+                      uk: { type: 'string', example: 'Тех Спонсор Інк.' },
+                      imageUrl: { type: 'string', format: 'uri' },
                     },
                   },
                 },
@@ -460,14 +511,12 @@ const options: swaggerJsdoc.Options = {
                 portrait: {
                   type: 'string',
                   format: 'uri',
-                  description: 'Portrait orientation image URL',
-                  example: 'https://example.com/event-image-portrait.jpg',
+                  example: 'https://example.com/event-portrait.jpg',
                 },
                 landscape: {
                   type: 'string',
                   format: 'uri',
-                  description: 'Landscape orientation image URL',
-                  example: 'https://example.com/event-image-landscape.jpg',
+                  example: 'https://example.com/event-landscape.jpg',
                 },
               },
             },
@@ -478,15 +527,37 @@ const options: swaggerJsdoc.Options = {
             },
             speakers: {
               type: 'array',
-              items: {
-                $ref: '#/components/schemas/Speaker',
-              },
-              description: 'List of speakers',
+              items: { $ref: '#/components/schemas/Speaker' },
+              description: 'Speaker details with optional bilingual translations',
             },
             gallery: {
               type: 'array',
               items: { type: 'string', format: 'uri' },
               description: 'Gallery image URLs',
+            },
+            distances: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/Distance' },
+            },
+            kidsDistances: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/KidsDistance' },
+            },
+            schedule: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/ScheduleItem' },
+            },
+            program: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/ScheduleItem' },
+              description: 'Alternative schedule format (same shape as schedule)',
+            },
+            map: {
+              type: 'object',
+              properties: {
+                latitude: { type: 'number', example: 50.4501 },
+                longitude: { type: 'number', example: 30.5234 },
+              },
             },
             createdAt: {
               type: 'string',
@@ -502,115 +573,211 @@ const options: swaggerJsdoc.Options = {
         },
         CreateEventInput: {
           type: 'object',
-          required: ['title', 'description', 'date', 'location', 'capacity'],
+          required: ['translations', 'date', 'capacity'],
           properties: {
+            translations: {
+              type: 'object',
+              required: ['title', 'description', 'location'],
+              description: 'Bilingual translations — all required at create time',
+              properties: {
+                title: {
+                  type: 'object',
+                  required: ['en'],
+                  properties: {
+                    en: { type: 'string', minLength: 3, maxLength: 100 },
+                    uk: { type: 'string', maxLength: 100 },
+                  },
+                },
+                description: {
+                  type: 'object',
+                  required: ['en'],
+                  properties: {
+                    en: { type: 'string', minLength: 10, maxLength: 2000 },
+                    uk: { type: 'string', maxLength: 2000 },
+                  },
+                },
+                location: {
+                  type: 'object',
+                  required: ['en'],
+                  properties: {
+                    en: { type: 'string', minLength: 3, maxLength: 200 },
+                    uk: { type: 'string', maxLength: 200 },
+                  },
+                },
+                date: {
+                  type: 'object',
+                  description: 'Display date strings (optional)',
+                  properties: {
+                    en: { type: 'string' },
+                    uk: { type: 'string' },
+                  },
+                },
+                partners: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      en: { type: 'string' },
+                      uk: { type: 'string' },
+                      imageUrl: { type: 'string', format: 'uri' },
+                    },
+                  },
+                },
+              },
+            },
             title: {
               type: 'string',
-              minLength: 3,
-              maxLength: 100,
-              description: 'Event title',
-              example: 'Tech Conference 2024',
+              description: 'Legacy title (falls back to translations.title.en)',
             },
             description: {
               type: 'string',
-              minLength: 10,
-              maxLength: 2000,
-              description: 'Event description',
-              example: 'Annual technology conference featuring industry leaders',
+              description: 'Legacy description (falls back to translations.description.en)',
+            },
+            location: {
+              type: 'string',
+              description: 'Legacy location (falls back to translations.location.en)',
             },
             date: {
               type: 'string',
               format: 'date-time',
-              description: 'Event date and time (must be in the future)',
-              example: '2024-12-15T10:00:00.000Z',
+              description:
+                'Event date and time. Past dates allowed for admin; future-only for organizers.',
+              example: '2025-12-15T08:00:00.000Z',
             },
-            location: {
-              type: 'string',
-              minLength: 3,
-              maxLength: 200,
-              description: 'Event location',
-              example: 'San Francisco Convention Center',
+            capacity: { type: 'integer', minimum: 1, maximum: 10000, example: 500 },
+            isActive: {
+              type: 'boolean',
+              default: true,
+              description: 'If false, event is hidden from public listings',
             },
-            capacity: {
-              type: 'integer',
-              minimum: 1,
-              maximum: 10000,
-              description: 'Maximum number of attendees',
-              example: 500,
-            },
+            lifecyclePhase: { $ref: '#/components/schemas/EventLifecyclePhase' },
+            status: { $ref: '#/components/schemas/EventStatus' },
+            slug: { type: 'string', example: 'kyiv-run-2025' },
+            shortDesc: { type: 'string', example: 'The biggest city race of the year' },
+            city: { type: 'string', example: 'Kyiv' },
+            venue: { type: 'string', example: 'Olympic Stadium' },
+            dateLabel: { type: 'string', example: '15 December 2025' },
+            timeLabel: { type: 'string', example: '08:00 – 14:00' },
+            cover: { type: 'string', format: 'uri' },
+            fee: { type: 'string', example: '500 UAH' },
+            afu: { type: 'string' },
+            perks: { type: 'array', items: { type: 'string' } },
+            spots: { $ref: '#/components/schemas/Spots' },
             imageUrl: {
               type: 'object',
-              description: 'Event image URLs (optional)',
               properties: {
-                portrait: {
-                  type: 'string',
-                  format: 'uri',
-                  description: 'Portrait orientation image URL',
-                  example: 'https://example.com/event-image-portrait.jpg',
-                },
-                landscape: {
-                  type: 'string',
-                  format: 'uri',
-                  description: 'Landscape orientation image URL',
-                  example: 'https://example.com/event-image-landscape.jpg',
-                },
+                portrait: { type: 'string', format: 'uri' },
+                landscape: { type: 'string', format: 'uri' },
+              },
+            },
+            basePrice: { type: 'number', minimum: 0 },
+            speakers: { type: 'array', items: { $ref: '#/components/schemas/Speaker' } },
+            gallery: { type: 'array', items: { type: 'string', format: 'uri' } },
+            distances: { type: 'array', items: { $ref: '#/components/schemas/Distance' } },
+            kidsDistances: { type: 'array', items: { $ref: '#/components/schemas/KidsDistance' } },
+            schedule: { type: 'array', items: { $ref: '#/components/schemas/ScheduleItem' } },
+            program: { type: 'array', items: { $ref: '#/components/schemas/ScheduleItem' } },
+            map: {
+              type: 'object',
+              properties: {
+                latitude: { type: 'number' },
+                longitude: { type: 'number' },
               },
             },
           },
         },
         UpdateEventInput: {
           type: 'object',
+          description:
+            'All fields optional. Admin sends full form payload; omitted arrays are preserved as-is.',
           properties: {
-            title: {
-              type: 'string',
-              minLength: 3,
-              maxLength: 100,
-              description: 'Event title',
-              example: 'Tech Conference 2024',
+            translations: {
+              type: 'object',
+              properties: {
+                title: {
+                  type: 'object',
+                  properties: {
+                    en: { type: 'string', minLength: 3, maxLength: 100 },
+                    uk: { type: 'string', maxLength: 100 },
+                  },
+                },
+                description: {
+                  type: 'object',
+                  properties: {
+                    en: { type: 'string', minLength: 10, maxLength: 2000 },
+                    uk: { type: 'string', maxLength: 2000 },
+                  },
+                },
+                location: {
+                  type: 'object',
+                  properties: {
+                    en: { type: 'string', minLength: 3, maxLength: 200 },
+                    uk: { type: 'string', maxLength: 200 },
+                  },
+                },
+                date: {
+                  type: 'object',
+                  properties: {
+                    en: { type: 'string' },
+                    uk: { type: 'string' },
+                  },
+                },
+                partners: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      en: { type: 'string' },
+                      uk: { type: 'string' },
+                      imageUrl: { type: 'string', format: 'uri' },
+                    },
+                  },
+                },
+              },
             },
-            description: {
-              type: 'string',
-              minLength: 10,
-              maxLength: 2000,
-              description: 'Event description',
-              example: 'Annual technology conference featuring industry leaders',
-            },
+            title: { type: 'string' },
+            description: { type: 'string' },
             date: {
               type: 'string',
               format: 'date-time',
-              description: 'Event date and time (must be in the future)',
-              example: '2024-12-15T10:00:00.000Z',
+              description: 'Past dates allowed for admin',
             },
-            location: {
-              type: 'string',
-              minLength: 3,
-              maxLength: 200,
-              description: 'Event location',
-              example: 'San Francisco Convention Center',
-            },
-            capacity: {
-              type: 'integer',
-              minimum: 1,
-              maximum: 10000,
-              description: 'Maximum number of attendees',
-              example: 500,
-            },
+            location: { type: 'string' },
+            capacity: { type: 'integer', minimum: 1, maximum: 10000 },
+            isActive: { type: 'boolean' },
+            lifecyclePhase: { $ref: '#/components/schemas/EventLifecyclePhase' },
+            status: { $ref: '#/components/schemas/EventStatus' },
+            slug: { type: 'string' },
+            shortDesc: { type: 'string' },
+            city: { type: 'string' },
+            venue: { type: 'string' },
+            dateLabel: { type: 'string' },
+            timeLabel: { type: 'string' },
+            cover: { type: 'string', format: 'uri' },
+            fee: { type: 'string' },
+            afu: { type: 'string' },
+            perks: { type: 'array', items: { type: 'string' } },
+            spots: { $ref: '#/components/schemas/Spots' },
             imageUrl: {
               type: 'object',
-              description: 'Event image URLs',
+              description: 'Partial update: provide only the variant(s) to change',
               properties: {
-                portrait: {
-                  type: 'string',
-                  format: 'uri',
-                  description: 'Portrait orientation image URL',
-                  example: 'https://example.com/event-image-portrait.jpg',
-                },
-                landscape: {
-                  type: 'string',
-                  format: 'uri',
-                  description: 'Landscape orientation image URL',
-                  example: 'https://example.com/event-image-landscape.jpg',
-                },
+                portrait: { type: 'string', format: 'uri' },
+                landscape: { type: 'string', format: 'uri' },
+              },
+            },
+            basePrice: { type: 'number', minimum: 0 },
+            speakers: { type: 'array', items: { $ref: '#/components/schemas/Speaker' } },
+            gallery: { type: 'array', items: { type: 'string', format: 'uri' } },
+            distances: { type: 'array', items: { $ref: '#/components/schemas/Distance' } },
+            kidsDistances: { type: 'array', items: { $ref: '#/components/schemas/KidsDistance' } },
+            schedule: { type: 'array', items: { $ref: '#/components/schemas/ScheduleItem' } },
+            program: { type: 'array', items: { $ref: '#/components/schemas/ScheduleItem' } },
+            map: {
+              type: 'object',
+              properties: {
+                latitude: { type: 'number' },
+                longitude: { type: 'number' },
               },
             },
           },
@@ -1446,62 +1613,71 @@ const options: swaggerJsdoc.Options = {
         get: {
           tags: ['Events'],
           summary: 'Get all events',
-          description: 'Get a paginated list of events with optional filters',
+          description:
+            'Paginated event list with optional filters. ' +
+            'Unauthenticated / non-admin callers always receive only active events (isActive=true). ' +
+            'Admin callers (Bearer token with isAdmin) see all events unless isActive is explicitly set.',
           parameters: [
             {
               name: 'page',
               in: 'query',
               description: 'Page number',
-              schema: {
-                type: 'integer',
-                minimum: 1,
-                default: 1,
-              },
+              schema: { type: 'integer', minimum: 1, default: 1 },
             },
             {
               name: 'limit',
               in: 'query',
               description: 'Items per page',
-              schema: {
-                type: 'integer',
-                minimum: 1,
-                maximum: 100,
-                default: 10,
-              },
+              schema: { type: 'integer', minimum: 1, maximum: 100, default: 10 },
             },
             {
               name: 'search',
               in: 'query',
-              description: 'Search in title and description',
-              schema: {
-                type: 'string',
-              },
+              description: 'Full-text search in title and description',
+              schema: { type: 'string' },
             },
             {
               name: 'startDate',
               in: 'query',
-              description: 'Filter events starting from this date',
-              schema: {
-                type: 'string',
-                format: 'date-time',
-              },
+              description: 'Filter events on or after this date (ISO 8601)',
+              schema: { type: 'string', format: 'date-time' },
             },
             {
               name: 'endDate',
               in: 'query',
-              description: 'Filter events until this date',
-              schema: {
-                type: 'string',
-                format: 'date-time',
-              },
+              description: 'Filter events on or before this date (ISO 8601)',
+              schema: { type: 'string', format: 'date-time' },
             },
             {
               name: 'location',
               in: 'query',
-              description: 'Filter by location',
-              schema: {
-                type: 'string',
-              },
+              description: 'Case-insensitive substring match on location',
+              schema: { type: 'string' },
+            },
+            {
+              name: 'lang',
+              in: 'query',
+              description: 'Locale for resolved title/description/location fields',
+              schema: { type: 'string', enum: ['en', 'uk'] },
+            },
+            {
+              name: 'status',
+              in: 'query',
+              description: 'Filter by legacy EventStatus',
+              schema: { $ref: '#/components/schemas/EventStatus' },
+            },
+            {
+              name: 'lifecyclePhase',
+              in: 'query',
+              description: 'Filter by admin lifecycle phase',
+              schema: { $ref: '#/components/schemas/EventLifecyclePhase' },
+            },
+            {
+              name: 'isActive',
+              in: 'query',
+              description:
+                'true — active only; false — inactive only; omit — admin sees all, public sees active only',
+              schema: { type: 'boolean' },
             },
           ],
           responses: {
@@ -1670,16 +1846,26 @@ const options: swaggerJsdoc.Options = {
         get: {
           tags: ['Events'],
           summary: 'Get event by ID',
-          description: 'Get detailed information about a specific event',
+          description:
+            'Returns a single event. ' +
+            'Public / unauthenticated callers only receive active events (isActive=true); 404 is returned for inactive ones. ' +
+            'Admin callers (Bearer token with isAdmin) receive the event regardless of isActive. ' +
+            'When lang is omitted, translations include both en and uk for every field — required by the admin edit form. ' +
+            'When lang=en|uk, translations may be locale-slimmed for public pages.',
           parameters: [
             {
               name: 'id',
               in: 'path',
               required: true,
-              description: 'Event ID',
-              schema: {
-                type: 'string',
-              },
+              description: 'Event ID (24-char MongoDB ObjectId)',
+              schema: { type: 'string' },
+            },
+            {
+              name: 'lang',
+              in: 'query',
+              description:
+                'Locale for resolved fields. Omit to get full bilingual translations (admin edit form).',
+              schema: { type: 'string', enum: ['en', 'uk'] },
             },
           ],
           responses: {
@@ -1688,27 +1874,26 @@ const options: swaggerJsdoc.Options = {
               content: {
                 'application/json': {
                   schema: {
-                    $ref: '#/components/schemas/Event',
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean' },
+                      data: { $ref: '#/components/schemas/Event' },
+                    },
                   },
                 },
               },
             },
             404: {
-              description: 'Event not found',
-              content: {
-                'application/json': {
-                  schema: {
-                    $ref: '#/components/schemas/Error',
-                  },
-                },
-              },
+              description: 'Event not found or inactive (for non-admin callers)',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
             },
           },
         },
         put: {
           tags: ['Events'],
           summary: 'Update event',
-          description: 'Update an event (requires authentication and ownership)',
+          description:
+            'Update an event. Organizers may update their own events; admins may update any event.',
           security: [
             {
               bearerAuth: [],

@@ -43,6 +43,20 @@ type EventDoc = {
   location: string;
   capacity: number;
   registeredCount: number;
+  isActive: boolean;
+  lifecyclePhase?: IEvent['lifecyclePhase'];
+  status?: IEvent['status'];
+  slug?: string;
+  shortDesc?: string;
+  city?: string;
+  venue?: string;
+  dateLabel?: string;
+  timeLabel?: string;
+  cover?: string;
+  fee?: string;
+  afu?: string;
+  perks?: string[];
+  spots?: { taken?: number; total?: number };
   organizerId?: mongoose.Types.ObjectId | { toString(): string } | undefined;
   imageUrl?:
     | {
@@ -53,6 +67,10 @@ type EventDoc = {
   basePrice?: number | undefined;
   speakers?: Speaker[] | undefined;
   gallery?: string[] | undefined;
+  distances?: IEvent['distances'];
+  kidsDistances?: IEvent['kidsDistances'];
+  schedule?: IEvent['schedule'];
+  program?: IEvent['program'];
   map?:
     | {
         latitude?: number;
@@ -161,6 +179,7 @@ function formatEventResponse(event: EventDoc, lang?: 'en' | 'uk'): EventResponse
     location: event.location,
     capacity: event.capacity,
     registeredCount: event.registeredCount,
+    isActive: event.isActive ?? true,
     createdAt: event.createdAt,
     updatedAt: event.updatedAt,
   };
@@ -168,6 +187,20 @@ function formatEventResponse(event: EventDoc, lang?: 'en' | 'uk'): EventResponse
   if (resolved.description !== undefined) response.resolvedDescription = resolved.description;
   if (resolved.location !== undefined) response.resolvedLocation = resolved.location;
   if (resolved.speakers !== undefined) response.resolvedSpeakers = resolved.speakers;
+  if (resolved.date !== undefined) response.resolvedDate = resolved.date;
+  if (event.lifecyclePhase !== undefined) response.lifecyclePhase = event.lifecyclePhase;
+  if (event.status !== undefined) response.status = event.status;
+  if (event.slug !== undefined) response.slug = event.slug;
+  if (event.shortDesc !== undefined) response.shortDesc = event.shortDesc;
+  if (event.city !== undefined) response.city = event.city;
+  if (event.venue !== undefined) response.venue = event.venue;
+  if (event.dateLabel !== undefined) response.dateLabel = event.dateLabel;
+  if (event.timeLabel !== undefined) response.timeLabel = event.timeLabel;
+  if (event.cover !== undefined) response.cover = event.cover;
+  if (event.fee !== undefined) response.fee = event.fee;
+  if (event.afu !== undefined) response.afu = event.afu;
+  if (event.perks !== undefined) response.perks = event.perks;
+  if (event.spots !== undefined) response.spots = event.spots;
   if (event.organizerId !== undefined) {
     response.organizerId = event.organizerId.toString();
   }
@@ -183,13 +216,16 @@ function formatEventResponse(event: EventDoc, lang?: 'en' | 'uk'): EventResponse
   if (event.gallery !== undefined) {
     response.gallery = event.gallery;
   }
+  if (event.distances !== undefined) response.distances = event.distances;
+  if (event.kidsDistances !== undefined) response.kidsDistances = event.kidsDistances;
+  if (event.schedule !== undefined) response.schedule = event.schedule;
+  if (event.program !== undefined) response.program = event.program;
   if (event.map !== undefined) {
     response.map = event.map;
   }
   if (event.organizer !== undefined) {
     response.organizer = event.organizer;
   }
-  if (resolved.date !== undefined) response.resolvedDate = resolved.date;
   return response;
 }
 
@@ -278,45 +314,91 @@ function mergeTranslationsForUpdate(
   }
   if (input.date !== undefined) updateFields.date = input.date;
   if (input.capacity !== undefined) updateFields.capacity = input.capacity;
-  if (input.imageUrl !== undefined) updateFields.imageUrl = input.imageUrl;
+  if (input.isActive !== undefined) updateFields.isActive = input.isActive;
+  if (input.lifecyclePhase !== undefined) updateFields.lifecyclePhase = input.lifecyclePhase;
+  if (input.status !== undefined) updateFields.status = input.status;
+  if (input.slug !== undefined) updateFields.slug = input.slug;
+  if (input.shortDesc !== undefined) updateFields.shortDesc = input.shortDesc;
+  if (input.city !== undefined) updateFields.city = input.city;
+  if (input.venue !== undefined) updateFields.venue = input.venue;
+  if (input.dateLabel !== undefined) updateFields.dateLabel = input.dateLabel;
+  if (input.timeLabel !== undefined) updateFields.timeLabel = input.timeLabel;
+  if (input.cover !== undefined) updateFields.cover = input.cover;
+  if (input.fee !== undefined) updateFields.fee = input.fee;
+  if (input.afu !== undefined) updateFields.afu = input.afu;
+  if (input.perks !== undefined) updateFields.perks = input.perks;
+  if (input.spots !== undefined) updateFields.spots = input.spots;
+  if (input.imageUrl !== undefined) {
+    // Partial merge for imageUrl
+    updateFields.imageUrl = {
+      portrait: input.imageUrl.portrait ?? '',
+      landscape: input.imageUrl.landscape ?? '',
+    };
+  }
   if (input.basePrice !== undefined) updateFields.basePrice = input.basePrice;
   if (input.gallery !== undefined) updateFields.gallery = input.gallery;
+  if (input.distances !== undefined) updateFields.distances = input.distances;
+  if (input.kidsDistances !== undefined) updateFields.kidsDistances = input.kidsDistances;
+  if (input.schedule !== undefined) updateFields.schedule = input.schedule;
+  if (input.program !== undefined) updateFields.program = input.program;
   if (input.map !== undefined) updateFields.map = input.map;
 
   return { updateFields };
 }
 
-export async function getEvents(
-  filters: EventFilters,
-  page?: number,
-  limit?: number,
-  lang?: 'en' | 'uk'
-): Promise<PaginatedResponse<EventResponse>> {
-  const { page: parsedPage, limit: parsedLimit, skip } = getPaginationParams(page, limit);
-
-  const query: {
-    $text?: { $search: string };
-    date?: { $gte?: Date; $lte?: Date };
-    location?: { $regex: string; $options: string };
-  } = {};
+/**
+ * Build the MongoDB query filter for listing events.
+ * Public callers always get isActive:true; admins see everything unless they
+ * explicitly pass isActive in the filters.
+ */
+function buildListQuery(filters: EventFilters, isAdmin: boolean): Record<string, unknown> {
+  const query: Record<string, unknown> = {};
 
   if (filters.search) {
     query.$text = { $search: filters.search };
   }
 
   if (filters.startDate || filters.endDate) {
-    query.date = {};
-    if (filters.startDate) {
-      query.date.$gte = filters.startDate;
-    }
-    if (filters.endDate) {
-      query.date.$lte = filters.endDate;
-    }
+    const dateRange: { $gte?: Date; $lte?: Date } = {};
+    if (filters.startDate) dateRange.$gte = filters.startDate;
+    if (filters.endDate) dateRange.$lte = filters.endDate;
+    query.date = dateRange;
   }
 
   if (filters.location) {
     query.location = { $regex: filters.location, $options: 'i' };
   }
+
+  if (filters.status) {
+    query.status = filters.status;
+  }
+
+  if (filters.lifecyclePhase) {
+    query.lifecyclePhase = filters.lifecyclePhase;
+  }
+
+  if (filters.isActive !== undefined) {
+    // Explicit filter wins for both public and admin
+    query.isActive = filters.isActive;
+  } else if (!isAdmin) {
+    // Public callers default to active-only
+    query.isActive = true;
+  }
+  // Admin without explicit isActive → no isActive constraint → sees everything
+
+  return query;
+}
+
+export async function getEvents(
+  filters: EventFilters,
+  page?: number,
+  limit?: number,
+  lang?: 'en' | 'uk',
+  isAdmin = false
+): Promise<PaginatedResponse<EventResponse>> {
+  const { page: parsedPage, limit: parsedLimit, skip } = getPaginationParams(page, limit);
+
+  const query = buildListQuery(filters, isAdmin);
 
   const total = await Event.countDocuments(query);
 
@@ -340,7 +422,7 @@ export async function getSingleEvent(lang?: 'en' | 'uk'): Promise<EventResponse>
   }
 
   if (!event) {
-    event = await Event.findOne().sort({ createdAt: 1 }).lean();
+    event = await Event.findOne({ isActive: true }).sort({ createdAt: 1 }).lean();
   }
 
   if (!event) {
@@ -350,12 +432,21 @@ export async function getSingleEvent(lang?: 'en' | 'uk'): Promise<EventResponse>
   return formatEventResponse(event, lang);
 }
 
-export async function getEventById(id: string, lang?: 'en' | 'uk'): Promise<EventResponse> {
+export async function getEventById(
+  id: string,
+  lang?: 'en' | 'uk',
+  isAdmin = false
+): Promise<EventResponse> {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw new NotFoundError('Invalid event ID');
   }
 
-  const event = await Event.findById(id).populate('organizer', 'name email image').lean();
+  const query: Record<string, unknown> = { _id: id };
+  if (!isAdmin) {
+    query.isActive = true;
+  }
+
+  const event = await Event.findOne(query).populate('organizer', 'name email image').lean();
 
   if (!event) {
     throw new NotFoundError('Event not found');
@@ -364,8 +455,12 @@ export async function getEventById(id: string, lang?: 'en' | 'uk'): Promise<Even
   return formatEventResponse(event as EventDoc, lang);
 }
 
-export async function createEvent(userId: string, input: CreateEventInput): Promise<EventResponse> {
-  if (new Date(input.date) <= new Date()) {
+export async function createEvent(
+  userId: string,
+  input: CreateEventInput,
+  isAdmin = false
+): Promise<EventResponse> {
+  if (!isAdmin && new Date(input.date) <= new Date()) {
     throw new ConflictError('Event date must be in the future');
   }
 
@@ -379,9 +474,27 @@ export async function createEvent(userId: string, input: CreateEventInput): Prom
     speakers: normalized.speakers,
     date: input.date,
     capacity: input.capacity,
+    isActive: input.isActive ?? true,
+    lifecyclePhase: input.lifecyclePhase,
+    status: input.status,
+    slug: input.slug,
+    shortDesc: input.shortDesc,
+    city: input.city,
+    venue: input.venue,
+    dateLabel: input.dateLabel,
+    timeLabel: input.timeLabel,
+    cover: input.cover,
+    fee: input.fee,
+    afu: input.afu,
+    perks: input.perks,
+    spots: input.spots,
     imageUrl: input.imageUrl,
     basePrice: input.basePrice,
     gallery: input.gallery,
+    distances: input.distances,
+    kidsDistances: input.kidsDistances,
+    schedule: input.schedule,
+    program: input.program,
     map: input.map,
     organizerId: userId,
     registeredCount: 0,
@@ -395,7 +508,8 @@ export async function createEvent(userId: string, input: CreateEventInput): Prom
 export async function updateEvent(
   id: string,
   userId: string,
-  input: UpdateEventInput
+  input: UpdateEventInput,
+  isAdmin = false
 ): Promise<EventResponse> {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw new NotFoundError('Invalid event ID');
@@ -407,11 +521,11 @@ export async function updateEvent(
     throw new NotFoundError('Event not found');
   }
 
-  if (event.organizerId.toString() !== userId) {
+  if (!isAdmin && event.organizerId.toString() !== userId) {
     throw new ForbiddenError('You are not authorized to update this event');
   }
 
-  if (input.date && new Date(input.date) <= new Date()) {
+  if (!isAdmin && input.date && new Date(input.date) <= new Date()) {
     throw new ConflictError('Event date must be in the future');
   }
 
@@ -425,7 +539,7 @@ export async function updateEvent(
   return formatEventResponse(event.toObject() as EventDoc);
 }
 
-export async function deleteEvent(id: string, userId: string): Promise<void> {
+export async function deleteEvent(id: string, userId: string, isAdmin = false): Promise<void> {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw new NotFoundError('Invalid event ID');
   }
@@ -436,7 +550,7 @@ export async function deleteEvent(id: string, userId: string): Promise<void> {
     throw new NotFoundError('Event not found');
   }
 
-  if (event.organizerId.toString() !== userId) {
+  if (!isAdmin && event.organizerId.toString() !== userId) {
     throw new ForbiddenError('You are not authorized to delete this event');
   }
 

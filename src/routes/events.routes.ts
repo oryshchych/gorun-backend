@@ -13,8 +13,8 @@ import {
   getEventRegistrations,
   getPublicParticipants,
 } from '../controllers/registrations.controller';
-import { authenticate } from '../middleware/auth.middleware';
-import { isEventOrganizer } from '../middleware/authorization.middleware';
+import { authenticate, optionalAuthenticate } from '../middleware/auth.middleware';
+import { isEventOrganizerOrAdmin } from '../middleware/authorization.middleware';
 import { ValidationType, validate } from '../middleware/validation.middleware';
 import { asyncHandler } from '../utils/asyncHandler';
 import {
@@ -33,9 +33,15 @@ const router = Router();
 
 /**
  * GET /api/events
- * Get all events with filters and pagination (public)
+ * Get all events with filters and pagination.
+ * Unauthenticated callers see only active events; admins see all.
  */
-router.get('/', validate(getEventsQuerySchema, ValidationType.QUERY), asyncHandler(getEvents));
+router.get(
+  '/',
+  optionalAuthenticate,
+  validate(getEventsQuerySchema, ValidationType.QUERY),
+  asyncHandler(getEvents)
+);
 
 /**
  * GET /api/events/single
@@ -46,7 +52,7 @@ router.get('/single', asyncHandler(getSingleEvent));
 /**
  * GET /api/events/my
  * Get events created by the authenticated user
- * Note: This must come before /:id to avoid route conflicts
+ * Note: Must come before /:id to avoid route conflicts
  */
 router.get(
   '/my',
@@ -67,9 +73,15 @@ router.get(
 
 /**
  * GET /api/events/:id
- * Get event by ID (public)
+ * Get event by ID.
+ * Unauthenticated callers can only see active events; admins see inactive too.
  */
-router.get('/:id', validate(eventIdSchema, ValidationType.PARAMS), asyncHandler(getEventById));
+router.get(
+  '/:id',
+  optionalAuthenticate,
+  validate(eventIdSchema, ValidationType.PARAMS),
+  asyncHandler(getEventById)
+);
 
 /**
  * POST /api/events
@@ -84,26 +96,26 @@ router.post(
 
 /**
  * PUT /api/events/:id
- * Update an event (requires authentication and authorization)
+ * Update an event — organizer of the event or any admin user
  */
 router.put(
   '/:id',
   authenticate,
   validate(eventIdSchema, ValidationType.PARAMS),
-  isEventOrganizer,
+  isEventOrganizerOrAdmin,
   validate(updateEventSchema, ValidationType.BODY),
   asyncHandler(updateEvent)
 );
 
 /**
  * DELETE /api/events/:id
- * Delete an event (requires authentication and authorization)
+ * Delete an event — organizer of the event or any admin user
  */
 router.delete(
   '/:id',
   authenticate,
   validate(eventIdSchema, ValidationType.PARAMS),
-  isEventOrganizer,
+  isEventOrganizerOrAdmin,
   asyncHandler(deleteEvent)
 );
 

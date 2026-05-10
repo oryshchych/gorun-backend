@@ -1,5 +1,15 @@
 import mongoose from 'mongoose';
-import { Speaker } from '../../models/Event';
+import type {
+  Distance,
+  EventLifecyclePhase,
+  EventStatus,
+  KidsDistance,
+  ScheduleItem,
+  Speaker,
+  Spots,
+} from '../../models/Event';
+
+export type { EventLifecyclePhase, EventStatus } from '../../models/Event';
 
 export type TranslationFields = {
   title?: { en?: string; uk?: string };
@@ -17,6 +27,20 @@ export interface CreateEventInput {
   date: Date;
   location?: string;
   capacity: number;
+  isActive?: boolean;
+  lifecyclePhase?: EventLifecyclePhase;
+  status?: EventStatus;
+  slug?: string;
+  shortDesc?: string;
+  city?: string;
+  venue?: string;
+  dateLabel?: string;
+  timeLabel?: string;
+  cover?: string;
+  fee?: string;
+  afu?: string;
+  perks?: string[];
+  spots?: Spots;
   imageUrl?: {
     portrait: string;
     landscape: string;
@@ -24,6 +48,10 @@ export interface CreateEventInput {
   basePrice?: number;
   speakers?: Speaker[];
   gallery?: string[];
+  distances?: Distance[];
+  kidsDistances?: KidsDistance[];
+  schedule?: ScheduleItem[];
+  program?: ScheduleItem[];
   map?: {
     latitude?: number;
     longitude?: number;
@@ -37,13 +65,31 @@ export interface UpdateEventInput {
   date?: Date;
   location?: string;
   capacity?: number;
+  isActive?: boolean;
+  lifecyclePhase?: EventLifecyclePhase;
+  status?: EventStatus;
+  slug?: string;
+  shortDesc?: string;
+  city?: string;
+  venue?: string;
+  dateLabel?: string;
+  timeLabel?: string;
+  cover?: string;
+  fee?: string;
+  afu?: string;
+  perks?: string[];
+  spots?: Spots;
   imageUrl?: {
-    portrait: string;
-    landscape: string;
+    portrait?: string;
+    landscape?: string;
   };
   basePrice?: number;
   speakers?: Speaker[];
   gallery?: string[];
+  distances?: Distance[];
+  kidsDistances?: KidsDistance[];
+  schedule?: ScheduleItem[];
+  program?: ScheduleItem[];
   map?: {
     latitude?: number;
     longitude?: number;
@@ -55,6 +101,9 @@ export interface EventFilters {
   startDate?: Date;
   endDate?: Date;
   location?: string;
+  status?: EventStatus;
+  lifecyclePhase?: EventLifecyclePhase;
+  isActive?: boolean;
 }
 
 export interface PopulatedOrganizer {
@@ -73,6 +122,20 @@ export interface EventResponse {
   location: string;
   capacity: number;
   registeredCount: number;
+  isActive: boolean;
+  lifecyclePhase?: EventLifecyclePhase;
+  status?: EventStatus;
+  slug?: string;
+  shortDesc?: string;
+  city?: string;
+  venue?: string;
+  dateLabel?: string;
+  timeLabel?: string;
+  cover?: string;
+  fee?: string;
+  afu?: string;
+  perks?: string[];
+  spots?: Spots;
   organizerId?: string;
   imageUrl?: {
     portrait: string;
@@ -81,6 +144,10 @@ export interface EventResponse {
   basePrice?: number;
   speakers?: Speaker[];
   gallery?: string[];
+  distances?: Distance[];
+  kidsDistances?: KidsDistance[];
+  schedule?: ScheduleItem[];
+  program?: ScheduleItem[];
   map?: {
     latitude?: number;
     longitude?: number;

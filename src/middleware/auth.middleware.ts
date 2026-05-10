@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
+import { User } from '../models/User';
 import { UnauthorizedError } from '../types/errors';
 import { verifyAccessToken } from '../utils/jwt.util';
 
@@ -59,5 +60,47 @@ export const authenticate = async (
     } else {
       next(new UnauthorizedError('Authentication failed'));
     }
+  }
+};
+
+/**
+ * Like authenticate but never rejects the request.
+ * If a valid Bearer token is present the user context (including isAdmin) is
+ * attached to req.user so downstream handlers can apply role-based logic.
+ * Unauthenticated requests simply proceed without req.user set.
+ */
+export const optionalAuthenticate = async (
+  req: AuthRequest,
+  _res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      next();
+      return;
+    }
+
+    const parts = authHeader.split(' ');
+    if (parts.length !== 2 || parts[0] !== 'Bearer' || !parts[1]) {
+      next();
+      return;
+    }
+
+    const payload = verifyAccessToken(parts[1]);
+
+    // Also load isAdmin so public list/detail routes can respect admin context
+    const user = await User.findById(payload.userId).select('isAdmin adminRole').lean();
+
+    req.user = {
+      userId: payload.userId,
+      isAdmin: user?.isAdmin ?? false,
+      adminRole: user?.adminRole ?? null,
+    };
+
+    next();
+  } catch {
+    // Invalid / expired token — treat as unauthenticated
+    next();
   }
 };

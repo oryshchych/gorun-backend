@@ -1,6 +1,6 @@
 import { z } from 'zod';
+import { EVENT_LIFECYCLE_PHASE_VALUES, EVENT_STATUS_VALUES } from '../models/Event';
 
-// Helper to validate MongoDB ObjectId format
 const objectIdRegex = /^[0-9a-fA-F]{24}$/;
 
 const localeString = (min: number, max: number) =>
@@ -41,16 +41,8 @@ const speakerSchema = z.object({
     .trim()
     .min(1, { message: 'Description must be at least 1 character' })
     .max(2000, { message: 'Description must not exceed 2000 characters' }),
-  image: z
-    .string()
-    .trim()
-    .url({ message: 'Image must be a valid URL' })
-    .min(1, { message: 'Image URL is required' }),
-  instagramLink: z
-    .string()
-    .trim()
-    .url({ message: 'Instagram link must be a valid URL' })
-    .min(1, { message: 'Instagram link is required' }),
+  image: z.string().trim().min(1, { message: 'Image URL is required' }),
+  instagramLink: z.string().trim().min(1, { message: 'Instagram link is required' }),
 });
 
 const translationsSchema = z.object({
@@ -107,25 +99,66 @@ const translationsSchema = z.object({
     .optional(),
 });
 
+const distanceSchema = z.object({
+  id: z.string().optional(),
+  label: z.string().trim().optional(),
+  name: z.string().trim().optional(),
+  km: z.number().optional(),
+  feeUah: z.number().optional(),
+  elevation: z.number().optional(),
+  laps: z.number().optional(),
+  spots: z.number().optional(),
+});
+
+const kidsDistanceSchema = z.object({
+  id: z.string().optional(),
+  label: z.string().trim().optional(),
+  name: z.string().trim().optional(),
+  age: z.string().trim().optional(),
+  feeUah: z.number().optional(),
+});
+
+const scheduleItemSchema = z.object({
+  time: z.string().trim().min(1),
+  what: z.string().trim().min(1),
+});
+
+const spotsSchema = z.object({
+  taken: z.number().int().min(0).optional(),
+  total: z.number().int().min(0).optional(),
+});
+
+const dateField = z
+  .string()
+  .or(z.date())
+  .transform(val => new Date(val));
+
 export const createEventSchema = z.object({
   translations: translationsSchema,
-  // Legacy fallbacks still accepted; they will be derived from translations if not provided
   title: z.string().optional(),
   description: z.string().optional(),
   location: z.string().optional(),
   speakers: z.array(speakerSchema).optional(),
-  date: z
-    .string()
-    .or(z.date())
-    .transform(val => new Date(val))
-    .refine(date => date > new Date(), {
-      message: 'Event date must be in the future',
-    }),
+  date: dateField,
   capacity: z
     .number()
     .int({ message: 'Capacity must be an integer' })
     .min(1, { message: 'Capacity must be at least 1' })
     .max(10000, { message: 'Capacity must not exceed 10000' }),
+  isActive: z.boolean().optional(),
+  lifecyclePhase: z.enum(EVENT_LIFECYCLE_PHASE_VALUES).optional(),
+  status: z.enum(EVENT_STATUS_VALUES).optional(),
+  slug: z.string().trim().optional(),
+  shortDesc: z.string().trim().optional(),
+  city: z.string().trim().optional(),
+  venue: z.string().trim().optional(),
+  dateLabel: z.string().trim().optional(),
+  timeLabel: z.string().trim().optional(),
+  cover: z.string().trim().optional(),
+  fee: z.string().trim().optional(),
+  afu: z.string().trim().optional(),
+  perks: z.array(z.string()).optional(),
+  spots: spotsSchema.optional(),
   imageUrl: z
     .object({
       portrait: z.string().url({ message: 'Portrait image URL must be a valid URL' }),
@@ -134,6 +167,10 @@ export const createEventSchema = z.object({
     .optional(),
   basePrice: z.number().nonnegative({ message: 'Base price cannot be negative' }).optional(),
   gallery: z.array(z.string().url({ message: 'Gallery items must be valid URLs' })).optional(),
+  distances: z.array(distanceSchema).optional(),
+  kidsDistances: z.array(kidsDistanceSchema).optional(),
+  schedule: z.array(scheduleItemSchema).optional(),
+  program: z.array(scheduleItemSchema).optional(),
   map: z
     .object({
       latitude: z.number().optional(),
@@ -151,14 +188,7 @@ export const updateEventSchema = z.object({
     .optional(),
   title: z.string().optional(),
   description: z.string().optional(),
-  date: z
-    .string()
-    .or(z.date())
-    .transform(val => new Date(val))
-    .refine(date => date > new Date(), {
-      message: 'Event date must be in the future',
-    })
-    .optional(),
+  date: dateField.optional(),
   location: z.string().optional(),
   capacity: z
     .number()
@@ -166,15 +196,33 @@ export const updateEventSchema = z.object({
     .min(1, { message: 'Capacity must be at least 1' })
     .max(10000, { message: 'Capacity must not exceed 10000' })
     .optional(),
+  isActive: z.boolean().optional(),
+  lifecyclePhase: z.enum(EVENT_LIFECYCLE_PHASE_VALUES).optional(),
+  status: z.enum(EVENT_STATUS_VALUES).optional(),
+  slug: z.string().trim().optional(),
+  shortDesc: z.string().trim().optional(),
+  city: z.string().trim().optional(),
+  venue: z.string().trim().optional(),
+  dateLabel: z.string().trim().optional(),
+  timeLabel: z.string().trim().optional(),
+  cover: z.string().trim().optional(),
+  fee: z.string().trim().optional(),
+  afu: z.string().trim().optional(),
+  perks: z.array(z.string()).optional(),
+  spots: spotsSchema.optional(),
   imageUrl: z
     .object({
-      portrait: z.string().url({ message: 'Portrait image URL must be a valid URL' }),
-      landscape: z.string().url({ message: 'Landscape image URL must be a valid URL' }),
+      portrait: z.string().url({ message: 'Portrait image URL must be a valid URL' }).optional(),
+      landscape: z.string().url({ message: 'Landscape image URL must be a valid URL' }).optional(),
     })
     .optional(),
   basePrice: z.number().nonnegative({ message: 'Base price cannot be negative' }).optional(),
   speakers: z.array(speakerSchema).optional(),
   gallery: z.array(z.string().url({ message: 'Gallery items must be valid URLs' })).optional(),
+  distances: z.array(distanceSchema).optional(),
+  kidsDistances: z.array(kidsDistanceSchema).optional(),
+  schedule: z.array(scheduleItemSchema).optional(),
+  program: z.array(scheduleItemSchema).optional(),
   map: z
     .object({
       latitude: z.number().optional(),
@@ -211,4 +259,14 @@ export const getEventsQuerySchema = z.object({
     .transform(val => (val ? new Date(val) : undefined)),
   location: z.string().optional(),
   lang: z.enum(['en', 'uk']).optional(),
+  status: z.enum(EVENT_STATUS_VALUES).optional(),
+  lifecyclePhase: z.enum(EVENT_LIFECYCLE_PHASE_VALUES).optional(),
+  isActive: z
+    .string()
+    .optional()
+    .transform(val => {
+      if (val === 'true') return true;
+      if (val === 'false') return false;
+      return undefined;
+    }),
 });

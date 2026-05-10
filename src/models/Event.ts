@@ -1,5 +1,11 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
+export const EVENT_STATUS_VALUES = ['UPCOMING', 'LIVE', 'FINISHED', 'CANCELLED'] as const;
+export type EventStatus = (typeof EVENT_STATUS_VALUES)[number];
+
+export const EVENT_LIFECYCLE_PHASE_VALUES = ['PLANNED', 'FUTURE', 'CURRENT', 'FINISHED'] as const;
+export type EventLifecyclePhase = (typeof EVENT_LIFECYCLE_PHASE_VALUES)[number];
+
 export interface TranslationField {
   en?: string;
   uk?: string;
@@ -21,6 +27,35 @@ export interface Speaker {
   instagramLink: string;
 }
 
+export interface Distance {
+  id?: string;
+  label?: string;
+  name?: string;
+  km?: number;
+  feeUah?: number;
+  elevation?: number;
+  laps?: number;
+  spots?: number;
+}
+
+export interface KidsDistance {
+  id?: string;
+  label?: string;
+  name?: string;
+  age?: string;
+  feeUah?: number;
+}
+
+export interface ScheduleItem {
+  time: string;
+  what: string;
+}
+
+export interface Spots {
+  taken?: number;
+  total?: number;
+}
+
 export interface IEvent extends Document {
   _id: mongoose.Types.ObjectId;
   translations?: {
@@ -38,6 +73,20 @@ export interface IEvent extends Document {
   capacity: number;
   registeredCount: number;
   organizerId: mongoose.Types.ObjectId;
+  isActive: boolean;
+  lifecyclePhase?: EventLifecyclePhase;
+  status?: EventStatus;
+  slug?: string;
+  shortDesc?: string;
+  city?: string;
+  venue?: string;
+  dateLabel?: string;
+  timeLabel?: string;
+  cover?: string;
+  fee?: string;
+  afu?: string;
+  perks?: string[];
+  spots?: Spots;
   imageUrl?: {
     portrait: string;
     landscape: string;
@@ -45,6 +94,10 @@ export interface IEvent extends Document {
   basePrice?: number;
   speakers?: Speaker[];
   gallery?: string[];
+  distances?: Distance[];
+  kidsDistances?: KidsDistance[];
+  schedule?: ScheduleItem[];
+  program?: ScheduleItem[];
   map?: {
     latitude?: number;
     longitude?: number;
@@ -88,7 +141,7 @@ const eventSchema = new Schema<IEvent>(
               type: String,
               validate: {
                 validator(value: string) {
-                  if (!value) return true; // Allow empty values
+                  if (!value) return true;
                   try {
                     new URL(value);
                     return true;
@@ -121,12 +174,6 @@ const eventSchema = new Schema<IEvent>(
     date: {
       type: Date,
       required: [true, 'Date is required'],
-      validate: {
-        validator(value: Date) {
-          return value > new Date();
-        },
-        message: 'Event date must be in the future',
-      },
     },
     location: {
       type: String,
@@ -154,6 +201,65 @@ const eventSchema = new Schema<IEvent>(
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: [true, 'Organizer ID is required'],
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    lifecyclePhase: {
+      type: String,
+      enum: EVENT_LIFECYCLE_PHASE_VALUES,
+    },
+    status: {
+      type: String,
+      enum: EVENT_STATUS_VALUES,
+    },
+    slug: {
+      type: String,
+      trim: true,
+    },
+    shortDesc: {
+      type: String,
+      trim: true,
+    },
+    city: {
+      type: String,
+      trim: true,
+    },
+    venue: {
+      type: String,
+      trim: true,
+    },
+    dateLabel: {
+      type: String,
+      trim: true,
+    },
+    timeLabel: {
+      type: String,
+      trim: true,
+    },
+    cover: {
+      type: String,
+      trim: true,
+    },
+    fee: {
+      type: String,
+      trim: true,
+    },
+    afu: {
+      type: String,
+      trim: true,
+    },
+    perks: {
+      type: [String],
+      default: undefined,
+    },
+    spots: {
+      type: {
+        taken: { type: Number, min: 0 },
+        total: { type: Number, min: 0 },
+      },
+      default: undefined,
     },
     imageUrl: {
       type: {
@@ -243,6 +349,51 @@ const eventSchema = new Schema<IEvent>(
         message: 'Gallery items must be valid URLs',
       },
     },
+    distances: {
+      type: [
+        {
+          id: { type: String },
+          label: { type: String, trim: true },
+          name: { type: String, trim: true },
+          km: { type: Number },
+          feeUah: { type: Number },
+          elevation: { type: Number },
+          laps: { type: Number },
+          spots: { type: Number },
+        },
+      ],
+      default: undefined,
+    },
+    kidsDistances: {
+      type: [
+        {
+          id: { type: String },
+          label: { type: String, trim: true },
+          name: { type: String, trim: true },
+          age: { type: String, trim: true },
+          feeUah: { type: Number },
+        },
+      ],
+      default: undefined,
+    },
+    schedule: {
+      type: [
+        {
+          time: { type: String, required: true, trim: true },
+          what: { type: String, required: true, trim: true },
+        },
+      ],
+      default: undefined,
+    },
+    program: {
+      type: [
+        {
+          time: { type: String, required: true, trim: true },
+          what: { type: String, required: true, trim: true },
+        },
+      ],
+      default: undefined,
+    },
     map: {
       type: {
         latitude: { type: Number },
@@ -273,6 +424,10 @@ const eventSchema = new Schema<IEvent>(
 eventSchema.index({ organizerId: 1 });
 eventSchema.index({ date: 1 });
 eventSchema.index({ location: 1 });
+eventSchema.index({ isActive: 1 });
+eventSchema.index({ status: 1 });
+eventSchema.index({ lifecyclePhase: 1 });
+eventSchema.index({ slug: 1 }, { sparse: true });
 eventSchema.index({ title: 'text', description: 'text' });
 
 // Virtual for organizer population
