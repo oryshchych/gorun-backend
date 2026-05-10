@@ -28,7 +28,7 @@ export const isEventOrganizer = async (
       throw new NotFoundError('Event not found');
     }
 
-    if (event.organizerId.toString() !== userId) {
+    if (event.organizerId?.toString() !== userId) {
       throw new ForbiddenError('You are not authorized to modify this event');
     }
 
@@ -62,12 +62,12 @@ export const isEventOrganizerOrAdmin = async (
       throw new NotFoundError('Event not found');
     }
 
-    if (event.organizerId.toString() === userId) {
+    if (event.organizerId?.toString() === userId) {
       next();
       return;
     }
 
-    // Not the organizer — check if the user is an admin
+    // Not the organizer (or organizerId absent) — check if the user is an admin
     const user = await User.findById(userId).select('isAdmin adminRole');
     if (user?.isAdmin) {
       // Propagate admin context so service layer can skip organizer-only checks
