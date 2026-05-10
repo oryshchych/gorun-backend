@@ -104,14 +104,24 @@ const distanceSpotsSchema = z.object({
   total: z.number().int().min(0).optional(),
 });
 
+/** Accepts a URL string or empty string; empty string is treated as undefined. */
+const optionalUrl = (message: string) =>
+  z.preprocess(val => (val === '' ? undefined : val), z.string().url({ message }).optional());
+
+/** Accepts a number, null, or empty string; empty string/null → null. */
+const optionalNumericOrEmpty = z.preprocess(
+  val => (val === '' || val === null ? null : val),
+  z.number().nullable().optional()
+);
+
 const distanceSchema = z.object({
   id: z.string().optional(),
   label: z.string().trim().optional(),
   name: z.string().trim().optional(),
-  km: z.number().optional(),
-  feeUah: z.number().optional(),
+  km: z.preprocess(val => (val === '' ? undefined : val), z.number().optional()),
+  feeUah: z.preprocess(val => (val === '' ? undefined : val), z.number().optional()),
   elevation: z.string().trim().optional(),
-  laps: z.number().nullable().optional(),
+  laps: optionalNumericOrEmpty,
   spots: distanceSpotsSchema.optional(),
 });
 
@@ -166,8 +176,8 @@ export const createEventSchema = z.object({
   spots: spotsSchema.optional(),
   imageUrl: z
     .object({
-      portrait: z.string().url({ message: 'Portrait image URL must be a valid URL' }),
-      landscape: z.string().url({ message: 'Landscape image URL must be a valid URL' }),
+      portrait: optionalUrl('Portrait image URL must be a valid URL'),
+      landscape: optionalUrl('Landscape image URL must be a valid URL'),
     })
     .optional(),
   basePrice: z.number().nonnegative({ message: 'Base price cannot be negative' }).optional(),
@@ -217,8 +227,8 @@ export const updateEventSchema = z.object({
   spots: spotsSchema.optional(),
   imageUrl: z
     .object({
-      portrait: z.string().url({ message: 'Portrait image URL must be a valid URL' }).optional(),
-      landscape: z.string().url({ message: 'Landscape image URL must be a valid URL' }).optional(),
+      portrait: optionalUrl('Portrait image URL must be a valid URL'),
+      landscape: optionalUrl('Landscape image URL must be a valid URL'),
     })
     .optional(),
   basePrice: z.number().nonnegative({ message: 'Base price cannot be negative' }).optional(),
