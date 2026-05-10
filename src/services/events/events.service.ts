@@ -515,13 +515,13 @@ export async function updateEvent(
     throw new NotFoundError('Invalid event ID');
   }
 
-  const event = await Event.findById(id);
+  const existing = await Event.findById(id).lean();
 
-  if (!event) {
+  if (!existing) {
     throw new NotFoundError('Event not found');
   }
 
-  if (!isAdmin && event.organizerId.toString() !== userId) {
+  if (!isAdmin && existing.organizerId?.toString() !== userId) {
     throw new ForbiddenError('You are not authorized to update this event');
   }
 
@@ -529,14 +529,24 @@ export async function updateEvent(
     throw new ConflictError('Event date must be in the future');
   }
 
-  const merged = mergeTranslationsForUpdate(event.toObject(), input);
+  const merged = mergeTranslationsForUpdate(existing, input);
 
-  Object.assign(event, merged.updateFields);
-  await event.save();
+  // Use $set so Mongoose only validates the fields being changed.
+  // This avoids required-field errors on pre-existing documents that have
+  // missing/null fields (e.g. organizerId) we are not touching.
+  const updated = await Event.findByIdAndUpdate(
+    id,
+    { $set: merged.updateFields },
+    { new: true, runValidators: false }
+  )
+    .populate('organizer', 'name email image')
+    .lean();
 
-  await event.populate('organizer', 'name email image');
+  if (!updated) {
+    throw new NotFoundError('Event not found');
+  }
 
-  return formatEventResponse(event.toObject() as EventDoc);
+  return formatEventResponse(updated as EventDoc);
 }
 
 export async function deleteEvent(id: string, userId: string, isAdmin = false): Promise<void> {
