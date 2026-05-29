@@ -41,6 +41,7 @@ export interface AdminPromoCodeResponse {
   discountType: 'percentage' | 'fixed';
   discountValue: number;
   eventId: string | null;
+  eventName: string | null;
   isActive: boolean;
   usageLimit: number | null;
   usedCount: number;
@@ -49,13 +50,17 @@ export interface AdminPromoCodeResponse {
   updatedAt: Date;
 }
 
-export function formatAdminPromo(doc: IPromoCode): AdminPromoCodeResponse {
+export function formatAdminPromo(
+  doc: IPromoCode,
+  eventName: string | null = null
+): AdminPromoCodeResponse {
   return {
     id: doc._id.toString(),
     code: doc.code,
     discountType: toApiDiscountType(doc.discountType),
     discountValue: doc.discountValue,
     eventId: doc.eventId ? doc.eventId.toString() : null,
+    eventName,
     isActive: doc.isActive,
     usageLimit: doc.usageLimit ?? null,
     usedCount: doc.usedCount,
@@ -199,10 +204,27 @@ export async function listAdminPromoCodes(
     filter.code = new RegExp(escaped, 'i');
   }
 
-  const total = await PromoCode.countDocuments(filter);
-  const docs = await PromoCode.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit);
+  const [total, docs] = await Promise.all([
+    PromoCode.countDocuments(filter),
+    PromoCode.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+  ]);
 
-  const data = docs.map(d => formatAdminPromo(d));
+  // Batch-resolve event names from the page's unique event IDs
+  const eventIds = [...new Set(docs.flatMap(d => (d.eventId ? [d.eventId.toString()] : [])))];
+  const eventNameMap = new Map<string, string>();
+  if (eventIds.length > 0) {
+    const events = await Event.find({ _id: { $in: eventIds } })
+      .select('title translations.title')
+      .lean();
+    for (const e of events) {
+      const name = e.translations?.title?.en ?? e.translations?.title?.uk ?? e.title;
+      eventNameMap.set(e._id.toString(), name);
+    }
+  }
+
+  const data = docs.map(d =>
+    formatAdminPromo(d, d.eventId ? (eventNameMap.get(d.eventId.toString()) ?? null) : null)
+  );
   return formatPaginatedResponse(data, total, page, limit);
 }
 
@@ -214,7 +236,14 @@ export async function getAdminPromoCodeById(id: string): Promise<AdminPromoCodeR
   if (!doc) {
     throw new NotFoundError('Promo code not found', PROMO_CODES_CODES.ERROR_PROMO_CODE_NOT_FOUND);
   }
-  return formatAdminPromo(doc);
+  let eventName: string | null = null;
+  if (doc.eventId) {
+    const event = await Event.findById(doc.eventId).select('title translations.title').lean();
+    if (event) {
+      eventName = event.translations?.title?.en ?? event.translations?.title?.uk ?? event.title;
+    }
+  }
+  return formatAdminPromo(doc, eventName);
 }
 
 export async function createAdminPromoCode(

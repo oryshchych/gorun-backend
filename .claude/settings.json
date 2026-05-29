@@ -12,7 +12,8 @@
       "Edit(/.claude/skills/add-validator/**)",
       "Edit(/.claude/skills/write-integration-test/**)",
       "Edit(/.claude/skills/partial-update-handler/**)",
-      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('.claude/settings.json','utf8'\\)\\); console.log\\('valid JSON'\\)\")"
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('.claude/settings.json','utf8'\\)\\); console.log\\('valid JSON'\\)\")",
+      "Bash(npm run *)"
     ],
     "additionalDirectories": ["/Users/yoryshchych/Documents/Personal/gorun-backend/.claude"]
   }
