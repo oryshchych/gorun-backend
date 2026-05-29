@@ -1,0 +1,39 @@
+---
+description: Controller conventions for gorun-backend. Applies when editing or creating files in src/controllers/.
+globs: src/controllers/**/*.ts
+alwaysApply: false
+---
+
+# Controller conventions
+
+Controllers live in `src/controllers/<domain>.controller.ts`. They are the HTTP layer only — no business logic.
+
+## Pattern
+
+```typescript
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/auth.middleware';
+import <domain>Service from '../services/<domain>/<domain>.service';
+
+export const get<Domain>s = async (req: AuthRequest, res: Response): Promise<void> => {
+  const q = req.validatedQuery as Get<Domain>sQuery;
+  const result = await <domain>Service.get<Domain>s(q.page, q.limit);
+  res.status(200).json({ success: true, data: result.data, pagination: result.pagination });
+};
+```
+
+## Rules
+
+- **Read from `req.validatedQuery` / `req.validatedParams` / `req.body`** — never `req.query` or `req.params` directly after the `validate()` middleware has run.
+- **Call exactly one service method** per handler.
+- **Response shape**: `{ success: true, data: ... }` for success, `res.status(204).send()` for deletes.
+- **Import `AuthRequest`** from `../middleware/auth.middleware` when `req.user` is needed.
+- **Access `req.user`**: use `req.user!.userId` after `authenticate`; use `req.user?.isAdmin ?? false` after `optionalAuthenticate`.
+- **Never throw errors in controllers** — let them propagate to the global error handler via `asyncHandler`.
+- **Never add business logic** (DB queries, calculations, email sends) — put that in the service.
+
+## Do not
+
+- Re-check `if (!id)` after the `validate()` middleware has already guaranteed the param exists — it's dead code.
+- Manually call `next(error)` — `asyncHandler` handles that.
+- Import Mongoose models directly into controllers.

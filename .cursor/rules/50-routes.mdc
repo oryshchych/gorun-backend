@@ -1,0 +1,74 @@
+---
+description: Express Router conventions for gorun-backend. Applies when editing or creating files in src/routes/.
+globs: src/routes/**/*.ts
+alwaysApply: false
+---
+
+# Route conventions
+
+Routes live in `src/routes/<domain>.routes.ts`. They wire middleware chains and nothing else.
+
+## Canonical middleware chain
+
+```typescript
+router.get(
+  '/:id',
+  optionalAuthenticate,                                  // 1. auth guard (optional or required)
+  validate(idSchema, ValidationType.PARAMS),             // 2. param validation
+  isEventOrganizerOrAdmin,                               // 3. authorization (after auth, before handler)
+  validate(querySchema, ValidationType.QUERY),           // 4. query/body validation
+  asyncHandler(getById)                                  // 5. handler — always last, always asyncHandler
+);
+```
+
+## Import pattern
+
+```typescript
+import { Router } from 'express';
+import { asyncHandler } from '../utils/asyncHandler';
+import { authenticate, optionalAuthenticate } from '../middleware/auth.middleware';
+import { isEventOrganizerOrAdmin } from '../middleware/authorization.middleware';
+import { requireAdmin } from '../middleware/admin.middleware';
+import { validate, ValidationType } from '../middleware/validation.middleware';
+import { <domain>IdSchema, create<Domain>Schema } from '../validators/<domain>.validator';
+import { get<Domain>s, create<Domain> } from '../controllers/<domain>.controller';
+
+const router = Router();
+// ... routes ...
+export default router;
+```
+
+## Auth guard selection
+
+| Route type | Guard |
+|---|---|
+| Public (no user needed) | no auth middleware |
+| Attaches user if present, no rejection | `optionalAuthenticate` |
+| Requires valid token, 401 if missing | `authenticate` |
+| Requires admin role | `authenticate` + `requireAdmin` |
+| Requires organizer or admin | `authenticate` + `isEventOrganizerOrAdmin` |
+
+## Static vs dynamic paths
+
+Named static paths (e.g., `/my`, `/single`, `/count`) **must come before** `/:id` in the file, otherwise Express matches them as IDs:
+
+```typescript
+router.get('/my', authenticate, asyncHandler(getMyItems));     // ✓ before /:id
+router.get('/:id', optionalAuthenticate, asyncHandler(getById)); // ✓ after
+```
+
+## Route registration in `src/app.ts`
+
+After creating a new route file, register it in `src/app.ts`:
+```typescript
+import <domain>Routes from './routes/<domain>.routes';
+app.use('/api/<domain>s', apiLimiter, <domain>Routes);
+```
+
+Always pass `apiLimiter`. Use `authLimiter` (stricter) only for auth routes.
+
+## Do not
+
+- Add business logic in route files
+- Call handlers without `asyncHandler` — uncaught async errors crash Express 5
+- Forget to register new route files in `src/app.ts`

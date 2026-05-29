@@ -1,0 +1,43 @@
+---
+description: Always-on project overview for gorun-backend. Provides stack, directory map, and layer boundaries for all AI assistance in this repo.
+globs: ""
+alwaysApply: true
+---
+
+# gorun-backend — Project Overview
+
+TypeScript/Express 5 REST API for a running-events platform. Handles events, registrations, payments (Plata by Monobank), Google OAuth, Resend email, and Cloudinary image uploads. Bilingual (Ukrainian + English).
+
+## Stack
+
+| Layer | Library | Version |
+|---|---|---|
+| Runtime | Node.js | 24.x |
+| Language | TypeScript | ^5.9.3 (strict mode) |
+| Framework | Express | ^5.2.1 |
+| Database | MongoDB + Mongoose | ^8.19.4 |
+| Validation | Zod | ^4.4.3 |
+| Auth | jsonwebtoken + bcrypt | ^9.0.3 / ^6.0.0 |
+| Testing | Jest + Supertest + mongodb-memory-server | ^29.7.0 |
+
+## Layer boundaries (never cross these)
+
+```
+routes → controllers → services → models
+```
+
+- **Routes** (`src/routes/`): Wire middleware chains only. No logic.
+- **Controllers** (`src/controllers/`): Extract validated request data, call one service method, return JSON. Zero business logic.
+- **Services** (`src/services/<domain>/`): All business logic and DB access. Throw typed AppError subclasses.
+- **Models** (`src/models/`): Mongoose schema + Document interface only.
+
+## Entry points
+
+- `src/server.ts` — connects MongoDB, starts Express, registers graceful shutdown
+- `src/app.ts` — `createApp()`: middleware chain, route mounts, error handlers
+
+## Pre-commit triad
+
+```bash
+npm run type-check && npm run lint && npm run format:check
+```

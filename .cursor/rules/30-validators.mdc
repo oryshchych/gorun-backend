@@ -1,0 +1,79 @@
+---
+description: Zod validator conventions for gorun-backend. Applies when editing or creating files in src/validators/.
+globs: src/validators/**/*.ts
+alwaysApply: false
+---
+
+# Validator conventions
+
+Validators live in `src/validators/<domain>.validator.ts`. They contain only Zod schemas — no business logic.
+
+## Imports
+
+```typescript
+import { z } from 'zod';
+import { EVENT_STATUS_VALUES } from '../models/Event';  // for enum validation
+```
+
+## ObjectId validation (define once per file)
+
+```typescript
+const objectIdRegex = /^[0-9a-fA-F]{24}$/;
+
+export const <domain>IdSchema = z.object({
+  id: z.string().regex(objectIdRegex, { message: 'Invalid ID format' }),
+});
+```
+
+Do NOT redefine `objectIdRegex` multiple times within the same file.
+
+## Pagination query block (copy exactly for list endpoints)
+
+```typescript
+page: z
+  .string()
+  .optional()
+  .transform(val => (val ? parseInt(val, 10) : 1))
+  .refine(val => val > 0, { message: 'Page must be greater than 0' }),
+limit: z
+  .string()
+  .optional()
+  .transform(val => (val ? parseInt(val, 10) : 10))
+  .refine(val => val > 0 && val <= 100, { message: 'Limit must be between 1 and 100' }),
+```
+
+Note: query params arrive as strings from Express — use `z.string().transform()`, not `z.number()`.
+
+## Schema naming
+
+| Purpose | Export name |
+|---|---|
+| Path ID param | `<domain>IdSchema` |
+| Create body | `create<Domain>Schema` |
+| Update body | `update<Domain>Schema` |
+| List query | `get<Domain>QuerySchema` |
+
+## ValidationType (how schemas are applied)
+
+Used in route files:
+```typescript
+import { validate, ValidationType } from '../middleware/validation.middleware';
+validate(schema, ValidationType.QUERY)   // query params → req.validatedQuery
+validate(schema, ValidationType.PARAMS)  // path params → req.validatedParams
+validate(schema, ValidationType.BODY)    // body → req.body
+```
+
+## Enum fields
+
+Import value arrays from models to keep Zod and Mongoose in sync:
+```typescript
+import { EVENT_STATUS_VALUES } from '../models/Event';
+status: z.enum(EVENT_STATUS_VALUES).optional()
+```
+
+## Do not
+
+- Use `z.number()` for query params — they're strings; use `z.string().transform(parseInt)`
+- Use `z.any()` — use `z.unknown()` with a comment if shape is genuinely unknown
+- Skip `.trim()` on string inputs that users type
+- Validate in controllers — the `validate()` middleware handles it before the handler runs

@@ -1,0 +1,59 @@
+---
+description: Middleware conventions for gorun-backend. Applies when editing or creating files in src/middleware/.
+globs: src/middleware/**/*.ts
+alwaysApply: false
+---
+
+# Middleware conventions
+
+Middleware lives in `src/middleware/<purpose>.middleware.ts`.
+
+## AuthRequest type
+
+`authenticate` and `optionalAuthenticate` attach `req.user` and provide `AuthRequest`:
+
+```typescript
+import { AuthRequest } from '../middleware/auth.middleware';
+// req.user shape:
+// { userId: string; isAdmin?: boolean; adminRole?: string | null }
+```
+
+- After `authenticate`: `req.user` is defined — use `req.user!.userId`
+- After `optionalAuthenticate`: `req.user` may be undefined — use `req.user?.isAdmin ?? false`
+
+## validate() middleware
+
+```typescript
+import { validate, ValidationType } from '../middleware/validation.middleware';
+// Stores parsed values in:
+// ValidationType.QUERY  → req.validatedQuery
+// ValidationType.PARAMS → req.validatedParams
+// ValidationType.BODY   → req.body
+```
+
+The reason for `req.validatedQuery` instead of `req.query` is an Express 5 constraint: `req.query` and `req.params` are getters and throw `TypeError` on assignment.
+
+## Error propagation
+
+In middleware, always call `next(new AppErrorSubclass(...))` for errors — never throw directly:
+
+```typescript
+import { ForbiddenError } from '../types/errors';
+import { GENERAL_CODES } from '../types/codes';
+
+next(new ForbiddenError('Not authorized', GENERAL_CODES.ERROR_FORBIDDEN));
+return;  // always return after next() in async middleware
+```
+
+## Adding a new middleware
+
+1. Export a named function: `export function myMiddleware(req, res, next) { ... }`
+2. Use `AuthRequest` if the middleware reads `req.user`
+3. For async middleware: use `async/await` and `next(error)` in catch — or wrap in `asyncHandler`
+4. Mount in `src/app.ts` (global) or `src/routes/<domain>.routes.ts` (route-specific)
+
+## Do not
+
+- Add DB lookups to middleware unless strictly necessary (auth/admin checks already query User)
+- Use `req.query` / `req.params` in middleware that runs after `validate()` — use `req.validatedQuery` / `req.validatedParams`
+- Throw errors directly in middleware — always call `next(error)`

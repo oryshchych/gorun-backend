@@ -1,0 +1,79 @@
+---
+description: Service layer conventions for gorun-backend. Applies when editing or creating files in src/services/.
+globs: src/services/**/*.ts
+alwaysApply: false
+---
+
+# Service layer conventions
+
+Services live in `src/services/<domain>/<domain>.service.ts`. They contain all business logic and database access.
+
+## File structure per domain
+
+```
+src/services/<domain>/
+  <domain>.service.ts   — business logic functions
+  <domain>.types.ts     — TypeScript input/output interfaces
+```
+
+## Pagination (always use the util)
+
+```typescript
+import { getPaginationParams, formatPaginatedResponse, PaginatedResponse } from '../../utils/pagination.util';
+
+async function get<Domain>s(page?: number, limit?: number): Promise<PaginatedResponse<<Domain>Response>> {
+  const { page: p, limit: l, skip } = getPaginationParams(page, limit);
+  const total = await <Domain>Model.countDocuments(query);
+  const items = await <Domain>Model.find(query).skip(skip).limit(l).lean();
+  return formatPaginatedResponse(map<Domain>s(items), total, p, l);
+}
+```
+
+Never hand-roll `skip = (page - 1) * limit` — use `getPaginationParams`.
+
+## Error throwing
+
+Always throw typed errors from `../../types/errors`:
+
+```typescript
+import { NotFoundError, ConflictError, ForbiddenError } from '../../types/errors';
+import { <DOMAIN>_CODES } from '../../types/codes';
+
+throw new NotFoundError('<Domain> not found', <DOMAIN>_CODES.ERROR_<DOMAIN>_NOT_FOUND);
+throw new ForbiddenError('Not authorized', <DOMAIN>_CODES.ERROR_<DOMAIN>_FORBIDDEN);
+throw new ConflictError('Already exists', <DOMAIN>_CODES.ERROR_<DOMAIN>_DUPLICATE);
+```
+
+Never throw `new Error(...)` — the global error handler doesn't map it properly.
+
+## Mongoose read queries
+
+Always use `.lean()` on read-only queries:
+```typescript
+const doc = await Model.findById(id).lean();
+const docs = await Model.find(query).sort({ date: -1 }).skip(skip).limit(limit).lean();
+```
+
+Use `.select('field1 field2')` to project only needed fields.
+
+## Partial updates
+
+Do not build update objects with per-field `if (field !== undefined)` guards. Pass the filtered object directly to `$set`:
+
+```typescript
+const updated = await Model.findByIdAndUpdate(
+  id,
+  { $set: input },          // input already has undefined fields filtered out
+  { new: true, runValidators: true }
+).lean();
+```
+
+## Logging
+
+```typescript
+import { logger } from '../../config/logger';
+logger.info('Event created', { eventId: event._id, userId });
+logger.warn('Payment failed', { paymentId, reason });
+```
+
+Never use `console.log`.

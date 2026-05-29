@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash([ -e \"/Users/yoryshchych/Documents/Personal/gorun-backend/$f\" ])",
+      "Bash([ -d \"/Users/yoryshchych/Documents/Personal/gorun-backend/$d\" ])",
+      "Bash(ln -sf AGENTS.md CLAUDE.md)",
+      "Bash(ln -sf AGENTS.md GEMINI.md)",
+      "Bash(ln -sf ../AGENTS.md .github/copilot-instructions.md)",
+      "Bash(mkdir -p /Users/yoryshchych/Documents/Personal/gorun-backend/.claude/agents /Users/yoryshchych/Documents/Personal/gorun-backend/.claude/skills/add-domain /Users/yoryshchych/Documents/Personal/gorun-backend/.claude/skills/add-route /Users/yoryshchych/Documents/Personal/gorun-backend/.claude/skills/add-validator /Users/yoryshchych/Documents/Personal/gorun-backend/.claude/skills/write-integration-test /Users/yoryshchych/Documents/Personal/gorun-backend/.claude/skills/partial-update-handler /Users/yoryshchych/Documents/Personal/gorun-backend/.claude/commands /Users/yoryshchych/Documents/Personal/gorun-backend/.cursor/rules /Users/yoryshchych/Documents/Personal/gorun-backend/docs/ai && echo \"dirs ok\")",
+      "Edit(/.claude/skills/add-domain/**)",
+      "Edit(/.claude/skills/add-route/**)",
+      "Edit(/.claude/skills/add-validator/**)",
+      "Edit(/.claude/skills/write-integration-test/**)",
+      "Edit(/.claude/skills/partial-update-handler/**)",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('.claude/settings.json','utf8'\\)\\); console.log\\('valid JSON'\\)\")"
+    ],
+    "additionalDirectories": ["/Users/yoryshchych/Documents/Personal/gorun-backend/.claude"]
+  }
+}

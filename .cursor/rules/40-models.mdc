@@ -1,0 +1,57 @@
+---
+description: Mongoose model conventions for gorun-backend. Applies when editing or creating files in src/models/.
+globs: src/models/**/*.ts
+alwaysApply: false
+---
+
+# Mongoose model conventions
+
+Models live in `src/models/<Domain>.ts`. Each file defines the Mongoose schema, the TypeScript Document interface, and the compiled Model.
+
+## File structure
+
+```typescript
+import mongoose, { Document, Schema } from 'mongoose';
+
+// 1. TypeScript interface extending Document
+export interface I<Domain> extends Document {
+  fieldName: string;
+  optionalField?: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// 2. Mongoose schema
+const <domain>Schema = new Schema<I<Domain>>(
+  {
+    fieldName: { type: String, required: true, trim: true },
+    optionalField: { type: Number },
+  },
+  { timestamps: true }   // adds createdAt and updatedAt automatically
+);
+
+// 3. Compiled model
+export const <Domain> = mongoose.model<I<Domain>>('<Domain>', <domain>Schema);
+```
+
+## Rules
+
+- **Always use `{ timestamps: true }`** in schema options — don't add `createdAt`/`updatedAt` manually.
+- **Use `.lean()`** on all read-only queries in services — returns plain objects, not Mongoose Documents.
+- **No business logic in models** — no methods, no static helpers. Put logic in services.
+- **Enum values**: export the values array alongside the type so Zod can import it:
+  ```typescript
+  export const EVENT_STATUS_VALUES = ['upcoming', 'active', 'completed', 'cancelled'] as const;
+  export type EventStatus = typeof EVENT_STATUS_VALUES[number];
+  ```
+- **Subdocument types**: export as named types so services can import them:
+  ```typescript
+  export type Speaker = { fullname: string; image: string; ... };
+  ```
+- **Indexes**: add them in the schema via `<domain>Schema.index({ field: 1 })` after the schema definition.
+
+## Do not
+
+- Embed business logic (pricing, validation, authorization) in Mongoose models
+- Return Mongoose Documents from services — map to plain `<Domain>Response` objects
+- Use `any` for subdocument types — define explicit TypeScript types
