@@ -137,7 +137,7 @@ app.use('/api/<domain>', apiLimiter, <domain>Routes);
 
 ## Output contract
 
-Produce all 6+ files, then state exactly which files were created/modified and remind the user to run `npm run pre-commit` to verify.
+Produce all 6+ files, then run `npm run pre-commit` and confirm it exits with zero errors before reporting the task as done. Never report success while TypeScript errors, lint violations, or formatting issues remain.
 
 ## Anti-patterns
 
@@ -145,4 +145,5 @@ Produce all 6+ files, then state exactly which files were created/modified and r
 - Do NOT throw `new Error(...)` in services — use typed AppError subclasses.
 - Do NOT add business logic in controllers.
 - Do NOT forget to register the router in `src/app.ts`.
+- Do NOT use `any` — it is a lint error (`@typescript-eslint/no-explicit-any: error`). Use explicit types or generics instead.
 - Do NOT redefine `objectIdRegex` per validator — it's already local to each file.

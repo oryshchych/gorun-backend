@@ -94,7 +94,7 @@ status: z.enum(EVENT_STATUS_VALUES).optional();
 
 ## Output contract
 
-Produce the complete schema file or the specific schema addition. After writing, identify which route(s) need to import and use the new schema.
+Produce the complete schema file or the specific schema addition. After writing, run `npm run pre-commit` and confirm zero errors before reporting done. Never leave TypeScript errors, lint violations, or formatting issues.
 
 ## Anti-patterns
 
@@ -102,3 +102,4 @@ Produce the complete schema file or the specific schema addition. After writing,
 - Do NOT duplicate the pagination block across files using copy-paste without reading whether a shared util exists.
 - Do NOT validate raw `req.query` in controllers — the `validate()` middleware has already done it by the time the controller runs.
 - Do NOT use `z.any()` or skip validation for fields "just for now".
+- Do NOT use TypeScript `any` — it is a lint error (`@typescript-eslint/no-explicit-any: error`). Use explicit types or `z.unknown()` with a comment if the shape is genuinely unknown.

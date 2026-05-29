@@ -101,10 +101,11 @@ const updateData = pickDefined({
 
 ## Output contract
 
-Produce the updated controller function and service method. After writing, run `npm run type-check` to confirm no type errors.
+Produce the updated controller function and service method. After writing, run `npm run pre-commit` and confirm zero errors (type-check + lint + format) before reporting done.
 
 ## Anti-patterns
 
 - Do NOT write field-by-field `if (field !== undefined)` guards — that's the pattern this agent fixes.
 - Do NOT pass `undefined` fields to `$set` — MongoDB treats `{ $set: { field: undefined } }` as a no-op but it wastes bandwidth and can cause type errors.
 - Do NOT use `req.query` or `req.params` directly in the controller — use `req.validatedParams` (validated by Zod middleware).
+- Do NOT use `any` — it is a lint error. Use typed generics (e.g., `Object.fromEntries(...) as UpdateInput`) instead.

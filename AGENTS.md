@@ -269,18 +269,20 @@ Events have bilingual content in a `translations` field: `{ title: { en, uk }, d
 
 ## Do / Don't
 
-| Do                                                                   | Don't                                                   |
-| -------------------------------------------------------------------- | ------------------------------------------------------- |
-| Throw typed `AppError` subclasses in services                        | Throw raw `Error` or `new Error(...)`                   |
-| Use `asyncHandler()` for every route handler                         | Call `handler().catch(next)` inline                     |
-| Store validated data in `req.validatedQuery` / `req.validatedParams` | Re-read raw `req.query` / `req.params` after validation |
-| Use `.lean()` on all read-only Mongoose queries                      | Return full Mongoose Documents to controllers           |
-| Use `getPaginationParams` + `formatPaginatedResponse`                | Hand-roll pagination math in services                   |
-| Add new codes to `src/types/codes.ts` in the right const             | Use string literals as error codes                      |
-| Register new routers in `src/app.ts` with `apiLimiter`               | Skip rate limiting on new routes                        |
-| Use `logger` (Winston) for all log output                            | Use `console.log` / `console.error`                     |
-| Use `ValidationType.QUERY` for query params (not BODY)               | Mix up BODY/QUERY/PARAMS enum values                    |
-| Import `AuthRequest` from `src/middleware/auth.middleware`           | Re-define the user type inline                          |
+| Do                                                                                               | Don't                                                                                                     |
+| ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| **Run `npm run pre-commit` after every change** — zero TS errors, lint errors, formatting issues | Leave any file with type errors, lint violations, or formatting issues                                    |
+| Use explicit TypeScript types on every function, parameter, and variable                         | Use `any` — explicit `any` is a lint error; implicit `any` is a TS compiler error (`noImplicitAny: true`) |
+| Throw typed `AppError` subclasses in services                                                    | Throw raw `Error` or `new Error(...)`                                                                     |
+| Use `asyncHandler()` for every route handler                                                     | Call `handler().catch(next)` inline                                                                       |
+| Store validated data in `req.validatedQuery` / `req.validatedParams`                             | Re-read raw `req.query` / `req.params` after validation                                                   |
+| Use `.lean()` on all read-only Mongoose queries                                                  | Return full Mongoose Documents to controllers                                                             |
+| Use `getPaginationParams` + `formatPaginatedResponse`                                            | Hand-roll pagination math in services                                                                     |
+| Add new codes to `src/types/codes.ts` in the right const                                         | Use string literals as error codes                                                                        |
+| Register new routers in `src/app.ts` with `apiLimiter`                                           | Skip rate limiting on new routes                                                                          |
+| Use `logger` (Winston) for all log output                                                        | Use `console.log` / `console.error`                                                                       |
+| Use `ValidationType.QUERY` for query params (not BODY)                                           | Mix up BODY/QUERY/PARAMS enum values                                                                      |
+| Import `AuthRequest` from `src/middleware/auth.middleware`                                       | Re-define the user type inline                                                                            |
 
 ---
 

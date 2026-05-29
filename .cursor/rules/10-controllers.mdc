@@ -37,3 +37,8 @@ export const get<Domain>s = async (req: AuthRequest, res: Response): Promise<voi
 - Re-check `if (!id)` after the `validate()` middleware has already guaranteed the param exists — it's dead code.
 - Manually call `next(error)` — `asyncHandler` handles that.
 - Import Mongoose models directly into controllers.
+- Use `any` — `@typescript-eslint/no-explicit-any: error` is active. Type everything explicitly.
+
+## Quality gate
+
+After every change: `npm run pre-commit` must exit with zero TypeScript errors, lint errors, and formatting issues.

@@ -110,7 +110,7 @@ describe('<Domain> API', () => {
 
 ## Output contract
 
-Produce complete test file(s) at the correct path. After writing, run `npm test` to confirm they pass.
+Produce complete test file(s) at the correct path. After writing, run `npm run pre-commit` (type-check + lint + format) and then `npm test`. Both must pass with zero errors before reporting done.
 
 ## Anti-patterns
 
@@ -119,3 +119,4 @@ Produce complete test file(s) at the correct path. After writing, run `npm test`
 - Do NOT import `createApp` — import the default `app` export.
 - Do NOT leave `console.log` calls in tests.
 - Do NOT write tests that depend on execution order — each test should be independent.
+- Do NOT use `any` — it is a lint error. Type all variables and function returns explicitly.

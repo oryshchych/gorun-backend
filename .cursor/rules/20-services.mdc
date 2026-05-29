@@ -77,3 +77,11 @@ logger.warn('Payment failed', { paymentId, reason });
 ```
 
 Never use `console.log`.
+
+## Do not
+
+- Use `any` — `@typescript-eslint/no-explicit-any: error` is active. Use explicit types or generics.
+
+## Quality gate
+
+After every change: `npm run pre-commit` must exit with zero TypeScript errors, lint errors, and formatting issues.

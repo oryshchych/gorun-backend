@@ -36,8 +36,16 @@ routes → controllers → services → models
 - `src/server.ts` — connects MongoDB, starts Express, registers graceful shutdown
 - `src/app.ts` — `createApp()`: middleware chain, route mounts, error handlers
 
-## Pre-commit triad
+## Quality gate — non-negotiable after every change
+
+After every edit, **all three must pass with zero errors**:
 
 ```bash
-npm run type-check && npm run lint && npm run format:check
+npm run pre-commit   # = type-check + lint + format:check
 ```
+
+- **`npm run type-check`** — `tsc --noEmit`. `noImplicitAny: true` (explicit in tsconfig, also covered by `strict: true`). No TypeScript errors allowed.
+- **`npm run lint`** — `@typescript-eslint/no-explicit-any: error` is active. Never use `any`. No lint errors allowed.
+- **`npm run format:check`** — Prettier. No unformatted files allowed.
+
+Never commit or report work as done while any of these fail.
