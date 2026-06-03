@@ -10,6 +10,19 @@ const DEACTIVATE_SCHEDULE = '0 * * * *';
  * Returns the number of documents that were updated.
  */
 export async function deactivateExpiredPromoCodes(): Promise<number> {
+  // Heal legacy promo codes whose expirationDate was inserted as a string (e.g. direct DB import).
+  // MongoDB's `$lt: <Date>` type-brackets and silently skips string-typed fields, so convert them
+  // to real Dates first. Unparseable strings become null (treated as no expiry).
+  await PromoCode.updateMany({ expirationDate: { $type: 'string' } }, [
+    {
+      $set: {
+        expirationDate: {
+          $convert: { input: '$expirationDate', to: 'date', onError: null, onNull: null },
+        },
+      },
+    },
+  ]);
+
   const result = await PromoCode.updateMany(
     { isActive: true, expirationDate: { $lt: new Date() } },
     { $set: { isActive: false } }

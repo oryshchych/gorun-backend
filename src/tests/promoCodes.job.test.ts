@@ -36,6 +36,26 @@ describe('deactivateExpiredPromoCodes', () => {
     expect(await isActiveByCode('NOEXPIRY')).toBe(true);
   });
 
+  it('normalizes and deactivates codes whose expirationDate was stored as a string', async () => {
+    // Insert via the raw driver to bypass Mongoose casting, simulating a direct DB import
+    // that stored expirationDate as a string (MongoDB $lt:<Date> would otherwise skip it).
+    await PromoCode.collection.insertOne({
+      code: 'STRDATE',
+      discountType: 'amount',
+      discountValue: 50,
+      isActive: true,
+      usedCount: 0,
+      expirationDate: '2016-02-01',
+    });
+
+    const count = await deactivateExpiredPromoCodes();
+
+    expect(count).toBeGreaterThanOrEqual(1);
+    const doc = await PromoCode.findOne({ code: 'STRDATE' });
+    expect(doc!.isActive).toBe(false);
+    expect(doc!.expirationDate).toBeInstanceOf(Date);
+  });
+
   it('returns 0 when there are no expired active codes', async () => {
     await PromoCode.create({
       code: 'FUTURE',

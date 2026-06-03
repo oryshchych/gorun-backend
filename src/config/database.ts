@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { databaseConfig } from './env';
 import { User } from '../models/User';
-import { PromoCode } from '../models/PromoCode';
+import { deactivateExpiredPromoCodes } from '../jobs/promoCodes.job';
 
 /**
  * Connect to MongoDB database
@@ -58,12 +58,9 @@ export const connectDatabase = async (): Promise<void> => {
 
     // Backfill: deactivate any promo codes whose expiration date has already passed
     try {
-      const result = await PromoCode.updateMany(
-        { isActive: true, expirationDate: { $lt: new Date() } },
-        { $set: { isActive: false } }
-      );
-      if (result.modifiedCount > 0) {
-        console.log(`🔄 Deactivated ${result.modifiedCount} expired promo code(s) on startup`);
+      const deactivated = await deactivateExpiredPromoCodes();
+      if (deactivated > 0) {
+        console.log(`🔄 Deactivated ${deactivated} expired promo code(s) on startup`);
       }
     } catch (error) {
       console.warn('⚠️  Expired promo code backfill warning (safe to ignore):', error);
