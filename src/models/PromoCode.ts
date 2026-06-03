@@ -10,6 +10,8 @@ export interface IPromoCode extends Document {
   usedCount: number;
   isActive: boolean;
   expirationDate?: Date;
+  /** Admin-only internal note; never exposed via the public validation endpoint */
+  notes?: string;
   eventId?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
@@ -49,6 +51,11 @@ const promoCodeSchema = new Schema<IPromoCode>(
     },
     expirationDate: {
       type: Date,
+    },
+    notes: {
+      type: String,
+      trim: true,
+      maxlength: [2000, 'Notes must not exceed 2000 characters'],
     },
     eventId: {
       type: Schema.Types.ObjectId,

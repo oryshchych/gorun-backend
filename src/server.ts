@@ -2,6 +2,7 @@ import app from './app';
 import { connectDatabase, disconnectDatabase } from './config/database';
 import { serverConfig } from './config/env';
 import { logger } from './config/logger';
+import { startPromoCodeJobs } from './jobs/promoCodes.job';
 
 /**
  * Start the Express server
@@ -12,6 +13,10 @@ const startServer = async (): Promise<void> => {
     await connectDatabase();
     logger.info('Database connection established');
 
+    // Schedule recurring background jobs
+    const promoCodeTask = startPromoCodeJobs();
+    logger.info('Scheduled jobs started');
+
     // Start Express server on configured PORT
     const server = app.listen(serverConfig.port, () => {
       logger.info(`Server running in ${serverConfig.nodeEnv} mode on port ${serverConfig.port}`);
@@ -21,6 +26,9 @@ const startServer = async (): Promise<void> => {
     // Handle graceful shutdown
     const gracefulShutdown = async (signal: string): Promise<void> => {
       logger.info(`${signal} received. Starting graceful shutdown...`);
+
+      // Stop scheduled jobs
+      await promoCodeTask.stop();
 
       // Stop accepting new connections
       server.close(async () => {

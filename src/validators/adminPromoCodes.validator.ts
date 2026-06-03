@@ -58,6 +58,7 @@ export const adminPromoCreateBodySchema = z
     isActive: z.boolean().optional().default(true),
     usageLimit: z.union([z.null(), z.number().int().positive()]).optional(),
     expirationDate: z.union([z.null(), z.string()]).optional(),
+    notes: z.union([z.null(), z.string().max(2000)]).optional(),
   })
   .strict()
   .superRefine((data, ctx) => {
@@ -88,6 +89,7 @@ export const adminPromoPatchBodySchema = z
     isActive: z.boolean().optional(),
     usageLimit: z.union([z.null(), z.number().int().positive()]).optional(),
     expirationDate: z.union([z.null(), z.string()]).optional(),
+    notes: z.union([z.null(), z.string().max(2000)]).optional(),
   })
   .strict()
   .superRefine((data, ctx) => {

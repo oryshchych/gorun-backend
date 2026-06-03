@@ -46,6 +46,7 @@ export interface AdminPromoCodeResponse {
   usageLimit: number | null;
   usedCount: number;
   expirationDate: string | null;
+  notes: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -65,6 +66,7 @@ export function formatAdminPromo(
     usageLimit: doc.usageLimit ?? null,
     usedCount: doc.usedCount,
     expirationDate: doc.expirationDate ? doc.expirationDate.toISOString() : null,
+    notes: doc.notes ?? null,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   };
@@ -86,6 +88,7 @@ export interface CreateAdminPromoInput {
   isActive: boolean;
   usageLimit?: number | null;
   expirationDate?: string | null;
+  notes?: string | null;
 }
 
 export interface PatchAdminPromoInput {
@@ -96,6 +99,7 @@ export interface PatchAdminPromoInput {
   isActive?: boolean;
   usageLimit?: number | null;
   expirationDate?: string | null;
+  notes?: string | null;
 }
 
 /**
@@ -273,6 +277,7 @@ export async function createAdminPromoCode(
     usedCount: 0,
     ...(body.usageLimit != null ? { usageLimit: body.usageLimit } : {}),
     ...(body.expirationDate ? { expirationDate: new Date(body.expirationDate) } : {}),
+    ...(body.notes != null ? { notes: body.notes } : {}),
   });
 
   return formatAdminPromo(doc);
@@ -338,6 +343,14 @@ export async function patchAdminPromoCode(
       doc.set('expirationDate', undefined);
     } else if (patch.expirationDate !== undefined) {
       doc.expirationDate = new Date(patch.expirationDate);
+    }
+  }
+
+  if ('notes' in patch) {
+    if (patch.notes === null) {
+      doc.set('notes', undefined);
+    } else if (patch.notes !== undefined) {
+      doc.notes = patch.notes;
     }
   }
 

@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { databaseConfig } from './env';
 import { User } from '../models/User';
+import { PromoCode } from '../models/PromoCode';
 
 /**
  * Connect to MongoDB database
@@ -53,6 +54,19 @@ export const connectDatabase = async (): Promise<void> => {
       }
     } catch (error) {
       console.warn('⚠️  Index migration warning (this is usually safe to ignore):', error);
+    }
+
+    // Backfill: deactivate any promo codes whose expiration date has already passed
+    try {
+      const result = await PromoCode.updateMany(
+        { isActive: true, expirationDate: { $lt: new Date() } },
+        { $set: { isActive: false } }
+      );
+      if (result.modifiedCount > 0) {
+        console.log(`🔄 Deactivated ${result.modifiedCount} expired promo code(s) on startup`);
+      }
+    } catch (error) {
+      console.warn('⚠️  Expired promo code backfill warning (safe to ignore):', error);
     }
 
     // Handle connection events
