@@ -368,6 +368,11 @@ function mergeTranslationsForUpdate(
   if (input.schedule !== undefined) updateFields.schedule = input.schedule;
   if (input.program !== undefined) updateFields.program = input.program;
   if (input.map !== undefined) updateFields.map = input.map;
+  if (input.organizerInfo !== undefined) updateFields.organizerInfo = input.organizerInfo;
+  if (input.organizerContactName !== undefined)
+    updateFields.organizerContactName = input.organizerContactName;
+  if (input.organizerContactInfo !== undefined)
+    updateFields.organizerContactInfo = input.organizerContactInfo;
 
   return { updateFields };
 }
