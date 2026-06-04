@@ -58,6 +58,11 @@ export interface CreateEventInput {
     latitude?: number;
     longitude?: number;
   };
+  registrationStart?: Date;
+  registrationEnd?: Date;
+  socials?: { instagram?: string; facebook?: string; telegram?: string };
+  regulationUrl?: string;
+  scheduleText?: string;
 }
 
 export interface UpdateEventInput {
@@ -96,6 +101,11 @@ export interface UpdateEventInput {
     latitude?: number;
     longitude?: number;
   };
+  registrationStart?: Date;
+  registrationEnd?: Date;
+  socials?: { instagram?: string; facebook?: string; telegram?: string };
+  regulationUrl?: string;
+  scheduleText?: string;
 }
 
 export interface EventFilters {
@@ -164,4 +174,9 @@ export interface EventResponse {
   resolvedDate?: string;
   /** Post-race recap resolved by `lang` query parameter. */
   resolvedPastDescription?: string;
+  registrationStart?: Date;
+  registrationEnd?: Date;
+  socials?: { instagram?: string; facebook?: string; telegram?: string };
+  regulationUrl?: string;
+  scheduleText?: string;
 }

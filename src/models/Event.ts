@@ -110,6 +110,15 @@ export interface IEvent extends Document {
     latitude?: number;
     longitude?: number;
   };
+  registrationStart?: Date;
+  registrationEnd?: Date;
+  socials?: {
+    instagram?: string;
+    facebook?: string;
+    telegram?: string;
+  };
+  regulationUrl?: string;
+  scheduleText?: string;
   createdAt: Date;
   updatedAt: Date;
   hasAvailableCapacity(): boolean;
@@ -419,6 +428,18 @@ const eventSchema = new Schema<IEvent>(
       },
       default: undefined,
     },
+    registrationStart: { type: Date },
+    registrationEnd: { type: Date },
+    socials: {
+      type: {
+        instagram: { type: String, trim: true },
+        facebook: { type: String, trim: true },
+        telegram: { type: String, trim: true },
+      },
+      default: undefined,
+    },
+    regulationUrl: { type: String, trim: true },
+    scheduleText: { type: String },
   } as Record<string, unknown>,
   {
     timestamps: true,

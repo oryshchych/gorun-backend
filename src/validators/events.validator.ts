@@ -198,6 +198,17 @@ export const createEventSchema = z.object({
       longitude: z.number().optional(),
     })
     .optional(),
+  registrationStart: z.coerce.date().optional(),
+  registrationEnd: z.coerce.date().optional(),
+  socials: z
+    .object({
+      instagram: z.string().trim().optional().or(z.literal('')),
+      facebook: z.string().trim().optional().or(z.literal('')),
+      telegram: z.string().trim().optional().or(z.literal('')),
+    })
+    .optional(),
+  regulationUrl: optionalUrl('Regulation URL must be a valid URL'),
+  scheduleText: z.string().max(5000).optional(),
 });
 
 export const updateEventSchema = z.object({
@@ -250,6 +261,17 @@ export const updateEventSchema = z.object({
       longitude: z.number().optional(),
     })
     .optional(),
+  registrationStart: z.coerce.date().optional(),
+  registrationEnd: z.coerce.date().optional(),
+  socials: z
+    .object({
+      instagram: z.string().trim().optional().or(z.literal('')),
+      facebook: z.string().trim().optional().or(z.literal('')),
+      telegram: z.string().trim().optional().or(z.literal('')),
+    })
+    .optional(),
+  regulationUrl: optionalUrl('Regulation URL must be a valid URL'),
+  scheduleText: z.string().max(5000).optional(),
 });
 
 export const eventIdSchema = z.object({
