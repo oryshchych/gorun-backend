@@ -119,6 +119,9 @@ export interface IEvent extends Document {
   };
   regulationUrl?: string;
   scheduleText?: string;
+  organizerInfo?: string;
+  organizerContactName?: string;
+  organizerContactInfo?: string;
   createdAt: Date;
   updatedAt: Date;
   hasAvailableCapacity(): boolean;
@@ -440,6 +443,9 @@ const eventSchema = new Schema<IEvent>(
     },
     regulationUrl: { type: String, trim: true },
     scheduleText: { type: String },
+    organizerInfo: { type: String, trim: true },
+    organizerContactName: { type: String, trim: true },
+    organizerContactInfo: { type: String, trim: true },
   } as Record<string, unknown>,
   {
     timestamps: true,

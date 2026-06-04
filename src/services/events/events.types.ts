@@ -63,6 +63,9 @@ export interface CreateEventInput {
   socials?: { instagram?: string; facebook?: string; telegram?: string };
   regulationUrl?: string;
   scheduleText?: string;
+  organizerInfo?: string;
+  organizerContactName?: string;
+  organizerContactInfo?: string;
 }
 
 export interface UpdateEventInput {
@@ -106,6 +109,9 @@ export interface UpdateEventInput {
   socials?: { instagram?: string; facebook?: string; telegram?: string };
   regulationUrl?: string;
   scheduleText?: string;
+  organizerInfo?: string;
+  organizerContactName?: string;
+  organizerContactInfo?: string;
 }
 
 export interface EventFilters {
@@ -179,4 +185,7 @@ export interface EventResponse {
   socials?: { instagram?: string; facebook?: string; telegram?: string };
   regulationUrl?: string;
   scheduleText?: string;
+  organizerInfo?: string;
+  organizerContactName?: string;
+  organizerContactInfo?: string;
 }

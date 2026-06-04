@@ -209,6 +209,9 @@ export const createEventSchema = z.object({
     .optional(),
   regulationUrl: optionalUrl('Regulation URL must be a valid URL'),
   scheduleText: z.string().max(5000).optional(),
+  organizerInfo: z.string().trim().max(300).optional(),
+  organizerContactName: z.string().trim().max(200).optional(),
+  organizerContactInfo: z.string().trim().max(500).optional(),
 });
 
 export const updateEventSchema = z.object({
@@ -272,6 +275,9 @@ export const updateEventSchema = z.object({
     .optional(),
   regulationUrl: optionalUrl('Regulation URL must be a valid URL'),
   scheduleText: z.string().max(5000).optional(),
+  organizerInfo: z.string().trim().max(300).optional(),
+  organizerContactName: z.string().trim().max(200).optional(),
+  organizerContactInfo: z.string().trim().max(500).optional(),
 });
 
 export const eventIdSchema = z.object({
