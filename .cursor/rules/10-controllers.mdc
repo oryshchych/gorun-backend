@@ -31,6 +31,12 @@ export const get<Domain>s = async (req: AuthRequest, res: Response): Promise<voi
 - **Access `req.user`**: use `req.user!.userId` after `authenticate`; use `req.user?.isAdmin ?? false` after `optionalAuthenticate`.
 - **Never throw errors in controllers** — let them propagate to the global error handler via `asyncHandler`.
 - **Never add business logic** (DB queries, calculations, email sends) — put that in the service.
+- **Build create/update payloads with `pickDefined<T>()`** from `../utils/pickDefined.util` — never a per-field `if (x !== undefined)` chain. The `validate()` middleware already strips unknown keys and coerces typed fields (e.g. dates), so `pickDefined<UpdateEventInput>(req.body)` is type-safe and needs no manual `new Date(...)`:
+
+  ```typescript
+  const updateData = pickDefined<UpdateEventInput>(req.body);
+  const result = await <domain>Service.update<Domain>(id, userId, updateData);
+  ```
 
 ## Do not
 

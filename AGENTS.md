@@ -240,7 +240,23 @@ Error codes come from `src/types/codes.ts`. Add domain-specific codes to the rel
 
 ### Partial update handlers
 
-Do NOT write field-by-field `if (field !== undefined) updateData.field = field` loops. Instead, destructure `req.body` then build the update object with only defined fields using `Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined))` or a typed `pickDefined<T>()` utility.
+Do NOT write field-by-field `if (field !== undefined) updateData.field = field` loops in controllers. Use the shared `pickDefined<T>()` utility from `src/utils/pickDefined.util.ts`:
+
+```typescript
+const updateData = pickDefined<UpdateEventInput>(req.body);
+```
+
+This is safe because `validate(schema, ValidationType.BODY)` already (a) strips unknown keys — Zod `z.object()` does this by default — and (b) coerces typed fields (e.g. `dateField` transforms strings to `Date`). So the validated `req.body` maps cleanly onto the service input type with no per-field guards and no manual `new Date(...)` conversions. Reach for an explicit `if`-chain only when a field needs per-field transformation that the validator does not already perform.
+
+### Field round-trip parity (avoid silently-dropped fields)
+
+A field is only "wired up" when it is present at **every** layer of its read/write path. The most common bug in this codebase is a field declared in the validator + model + types but silently dropped because one layer's hand-maintained mapping was not updated. When you add a field to a resource — or notice one isn't persisting — verify the **entire** chain, not just the layer you're touching:
+
+**Write path** (create/update): validator schema → service input type (`CreateEventInput` / `UpdateEventInput`) → controller forwarding (`pickDefined` covers this automatically) → service write (`Model.create({...})` enumerated payload **and** the update merge helper, e.g. `mergeTranslationsForUpdate`) → Mongoose schema + `IEvent`.
+
+**Read path** (GET): Mongoose schema → the service's internal projection type (e.g. `EventDoc`) → the response formatter (`formatEventResponse`) → the public response type (`EventResponse`).
+
+The silent-failure layers are the **hand-maintained** ones: enumerated `Model.create({...})` payloads, the update merge helper, the `EventDoc`-style projection type, and `formatEventResponse`. `pickDefined` removed the controller from this list, but the service write/read mappings are still enumerated by hand — always add the field there. Add an integration test asserting the field survives create→GET and update→GET (see `src/tests/events.organizer.test.ts`).
 
 ### Mongoose models
 

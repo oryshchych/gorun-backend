@@ -10,6 +10,9 @@ process.env.JWT_ACCESS_EXPIRY = '15m';
 process.env.JWT_REFRESH_EXPIRY = '7d';
 process.env.CORS_ORIGIN = 'http://localhost:3000';
 process.env.PORT = '5000';
+process.env.CLOUDINARY_CLOUD_NAME = 'test-cloud';
+process.env.CLOUDINARY_API_KEY = 'test-api-key';
+process.env.CLOUDINARY_API_SECRET = 'test-api-secret';
 
 let mongoServer: MongoMemoryServer;
 

@@ -58,7 +58,7 @@ Use `.select('field1 field2')` to project only needed fields.
 
 ## Partial updates
 
-Do not build update objects with per-field `if (field !== undefined)` guards. Pass the filtered object directly to `$set`:
+Prefer passing the already-filtered input object (controllers build it with `pickDefined`) straight to `$set`:
 
 ```typescript
 const updated = await Model.findByIdAndUpdate(
@@ -67,6 +67,17 @@ const updated = await Model.findByIdAndUpdate(
   { new: true, runValidators: true }
 ).lean();
 ```
+
+If a write helper instead enumerates fields by hand (e.g. an `Model.create({...})` payload or a `mergeXForUpdate` builder), every new field MUST be added there too — see field round-trip parity below.
+
+## Field round-trip parity (avoid silently-dropped fields)
+
+The #1 recurring bug here: a field is declared in the validator + model + types but never persists or never appears on GET, because one hand-maintained mapping in the service was not updated. When adding a field (or debugging one that "saves 200 but disappears"), check the whole chain:
+
+- **Write**: `Model.create({...})` enumerated payload **and** the update merge helper (e.g. `mergeTranslationsForUpdate`).
+- **Read**: the internal projection type (e.g. `EventDoc`) **and** the response formatter (e.g. `formatEventResponse`).
+
+These four are the silent-failure points — they are enumerated by hand, so TypeScript won't flag a missing field (the input/response interfaces are wider than what the code actually copies). Always add an integration test asserting create→GET and update→GET round-trip (pattern: `src/tests/events.organizer.test.ts`).
 
 ## Logging
 

@@ -1,7 +1,12 @@
 import { Request, Response } from 'express';
 import type { z } from 'zod';
 import { AuthRequest } from '../middleware/auth.middleware';
-import eventsService, { EventFilters, UpdateEventInput } from '../services/events/events.service';
+import eventsService, {
+  CreateEventInput,
+  EventFilters,
+  UpdateEventInput,
+} from '../services/events/events.service';
+import { pickDefined } from '../utils/pickDefined.util';
 import { getEventsQuerySchema } from '../validators/events.validator';
 
 type GetEventsQuery = z.infer<typeof getEventsQuerySchema>;
@@ -94,73 +99,12 @@ export const getEventById = async (req: AuthRequest, res: Response): Promise<voi
 export const createEvent = async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user!.userId;
   const isAdmin = req.user?.isAdmin ?? false;
-  const {
-    translations,
-    title,
-    description,
-    date,
-    location,
-    capacity,
-    isActive,
-    lifecyclePhase,
-    status,
-    slug,
-    shortDesc,
-    city,
-    venue,
-    dateLabel,
-    timeLabel,
-    cover,
-    fee,
-    afu,
-    perks,
-    spots,
-    imageUrl,
-    basePrice,
-    speakers,
-    gallery,
-    distances,
-    kidsDistances,
-    schedule,
-    program,
-    map,
-  } = req.body;
 
-  const event = await eventsService.createEvent(
-    userId,
-    {
-      translations,
-      title,
-      description,
-      date: new Date(date),
-      location,
-      capacity,
-      isActive,
-      lifecyclePhase,
-      status,
-      slug,
-      shortDesc,
-      city,
-      venue,
-      dateLabel,
-      timeLabel,
-      cover,
-      fee,
-      afu,
-      perks,
-      spots,
-      imageUrl,
-      basePrice,
-      speakers,
-      gallery,
-      distances,
-      kidsDistances,
-      schedule,
-      program,
-      map,
-    },
-    isAdmin
-  );
+  // The validator already coerces `date` to a Date and strips unknown keys, so
+  // the validated body maps cleanly onto CreateEventInput.
+  const input = pickDefined<CreateEventInput>(req.body);
+
+  const event = await eventsService.createEvent(userId, input, isAdmin);
 
   res.status(201).json({
     success: true,
@@ -176,76 +120,10 @@ export const updateEvent = async (req: AuthRequest, res: Response): Promise<void
   const { id } = req.validatedParams as { id: string };
   const userId = req.user!.userId;
   const isAdmin = req.user?.isAdmin ?? false;
-  const {
-    translations,
-    title,
-    description,
-    date,
-    location,
-    capacity,
-    isActive,
-    lifecyclePhase,
-    status,
-    slug,
-    shortDesc,
-    city,
-    venue,
-    dateLabel,
-    timeLabel,
-    cover,
-    fee,
-    afu,
-    perks,
-    spots,
-    imageUrl,
-    basePrice,
-    speakers,
-    gallery,
-    distances,
-    kidsDistances,
-    schedule,
-    program,
-    map,
-  } = req.body;
 
-  if (!id) {
-    res.status(400).json({
-      success: false,
-      message: 'Event ID is required',
-    });
-    return;
-  }
-
-  const updateData: UpdateEventInput = {};
-  if (translations !== undefined) updateData.translations = translations;
-  if (title !== undefined) updateData.title = title;
-  if (description !== undefined) updateData.description = description;
-  if (date !== undefined) updateData.date = new Date(date);
-  if (location !== undefined) updateData.location = location;
-  if (capacity !== undefined) updateData.capacity = capacity;
-  if (isActive !== undefined) updateData.isActive = isActive;
-  if (lifecyclePhase !== undefined) updateData.lifecyclePhase = lifecyclePhase;
-  if (status !== undefined) updateData.status = status;
-  if (slug !== undefined) updateData.slug = slug;
-  if (shortDesc !== undefined) updateData.shortDesc = shortDesc;
-  if (city !== undefined) updateData.city = city;
-  if (venue !== undefined) updateData.venue = venue;
-  if (dateLabel !== undefined) updateData.dateLabel = dateLabel;
-  if (timeLabel !== undefined) updateData.timeLabel = timeLabel;
-  if (cover !== undefined) updateData.cover = cover;
-  if (fee !== undefined) updateData.fee = fee;
-  if (afu !== undefined) updateData.afu = afu;
-  if (perks !== undefined) updateData.perks = perks;
-  if (spots !== undefined) updateData.spots = spots;
-  if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
-  if (basePrice !== undefined) updateData.basePrice = basePrice;
-  if (speakers !== undefined) updateData.speakers = speakers;
-  if (gallery !== undefined) updateData.gallery = gallery;
-  if (distances !== undefined) updateData.distances = distances;
-  if (kidsDistances !== undefined) updateData.kidsDistances = kidsDistances;
-  if (schedule !== undefined) updateData.schedule = schedule;
-  if (program !== undefined) updateData.program = program;
-  if (map !== undefined) updateData.map = map;
+  // The validator already coerces `date` to a Date and strips unknown keys, so
+  // the validated body maps cleanly onto UpdateEventInput's defined fields.
+  const updateData = pickDefined<UpdateEventInput>(req.body);
 
   const event = await eventsService.updateEvent(id, userId, updateData, isAdmin);
 

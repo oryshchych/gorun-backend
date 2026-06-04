@@ -59,6 +59,9 @@ type EventDoc = {
   perks?: string[];
   spots?: { taken?: number; total?: number };
   organizerId?: mongoose.Types.ObjectId | { toString(): string } | undefined;
+  organizerInfo?: string;
+  organizerContactName?: string;
+  organizerContactInfo?: string;
   imageUrl?:
     | {
         portrait: string;
@@ -78,6 +81,11 @@ type EventDoc = {
         longitude?: number;
       }
     | undefined;
+  registrationStart?: Date;
+  registrationEnd?: Date;
+  socials?: { instagram?: string; facebook?: string; telegram?: string };
+  regulationUrl?: string;
+  scheduleText?: string;
   createdAt: Date;
   updatedAt: Date;
   organizer?: PopulatedOrganizer | undefined;
@@ -237,6 +245,18 @@ function formatEventResponse(event: EventDoc, lang?: 'en' | 'uk'): EventResponse
   if (event.organizer !== undefined) {
     response.organizer = event.organizer;
   }
+  if (event.organizerInfo !== undefined) response.organizerInfo = event.organizerInfo;
+  if (event.organizerContactName !== undefined) {
+    response.organizerContactName = event.organizerContactName;
+  }
+  if (event.organizerContactInfo !== undefined) {
+    response.organizerContactInfo = event.organizerContactInfo;
+  }
+  if (event.registrationStart !== undefined) response.registrationStart = event.registrationStart;
+  if (event.registrationEnd !== undefined) response.registrationEnd = event.registrationEnd;
+  if (event.socials !== undefined) response.socials = event.socials;
+  if (event.regulationUrl !== undefined) response.regulationUrl = event.regulationUrl;
+  if (event.scheduleText !== undefined) response.scheduleText = event.scheduleText;
   return response;
 }
 
@@ -373,6 +393,12 @@ function mergeTranslationsForUpdate(
     updateFields.organizerContactName = input.organizerContactName;
   if (input.organizerContactInfo !== undefined)
     updateFields.organizerContactInfo = input.organizerContactInfo;
+  if (input.registrationStart !== undefined)
+    updateFields.registrationStart = input.registrationStart;
+  if (input.registrationEnd !== undefined) updateFields.registrationEnd = input.registrationEnd;
+  if (input.socials !== undefined) updateFields.socials = input.socials;
+  if (input.regulationUrl !== undefined) updateFields.regulationUrl = input.regulationUrl;
+  if (input.scheduleText !== undefined) updateFields.scheduleText = input.scheduleText;
 
   return { updateFields };
 }
@@ -560,6 +586,14 @@ export async function createEvent(
     schedule: input.schedule,
     program: input.program,
     map: input.map,
+    organizerInfo: input.organizerInfo,
+    organizerContactName: input.organizerContactName,
+    organizerContactInfo: input.organizerContactInfo,
+    registrationStart: input.registrationStart,
+    registrationEnd: input.registrationEnd,
+    socials: input.socials,
+    regulationUrl: input.regulationUrl,
+    scheduleText: input.scheduleText,
     organizerId: userId,
     registeredCount: 0,
   });
