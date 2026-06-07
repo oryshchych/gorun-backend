@@ -120,16 +120,73 @@ const optionalNumericOrEmpty = z.preprocess(
   z.number().nullable().optional()
 );
 
-const distanceSchema = z.object({
-  id: z.string().optional(),
-  label: z.string().trim().optional(),
-  name: z.string().trim().optional(),
-  km: z.preprocess(val => (val === '' ? undefined : val), z.number().optional()),
-  feeUah: z.preprocess(val => (val === '' ? undefined : val), z.number().optional()),
-  elevation: z.string().trim().optional(),
-  laps: optionalNumericOrEmpty,
-  spots: distanceSpotsSchema.optional(),
+const pricePeriodSchema = z.object({
+  from: z.coerce.date(),
+  to: z.coerce.date(),
+  price: z.number().positive({ message: 'Price must be greater than 0' }),
 });
+
+const distanceSchema = z
+  .object({
+    id: z.string().optional(),
+    label: z.string().trim().optional(),
+    name: z.string().trim().max(100).optional(),
+    km: z.preprocess(val => (val === '' ? undefined : val), z.number().optional()),
+    feeUah: z.preprocess(val => (val === '' ? undefined : val), z.number().optional()),
+    elevation: z.string().trim().optional(),
+    laps: optionalNumericOrEmpty,
+    spots: distanceSpotsSchema.optional(),
+    distanceMeters: z.preprocess(
+      val => (val === '' || val === null ? undefined : val),
+      z.number().int().min(1).max(999999).optional()
+    ),
+    startAt: z.coerce
+      .date()
+      .optional()
+      .or(z.literal('').transform(() => undefined)),
+    participantLimit: z.preprocess(
+      val => (val === '' || val === null ? undefined : val),
+      z.number().int().min(1).optional()
+    ),
+    bibFrom: z.preprocess(
+      val => (val === '' || val === null ? undefined : val),
+      z.number().int().min(0).optional()
+    ),
+    bibTo: z.preprocess(
+      val => (val === '' || val === null ? undefined : val),
+      z.number().int().min(0).optional()
+    ),
+    isKids: z.boolean().optional(),
+    discountPensioner: z.preprocess(
+      val => (val === '' || val === null ? undefined : val),
+      z.number().int().min(0).max(100).optional()
+    ),
+    discountVeteran: z.preprocess(
+      val => (val === '' || val === null ? undefined : val),
+      z.number().int().min(0).max(100).optional()
+    ),
+    discountDisability: z.preprocess(
+      val => (val === '' || val === null ? undefined : val),
+      z.number().int().min(0).max(100).optional()
+    ),
+    minAge: z.preprocess(
+      val => (val === '' || val === null ? undefined : val),
+      z.number().int().min(0).optional()
+    ),
+    maxAge: z.preprocess(
+      val => (val === '' || val === null ? undefined : val),
+      z.number().int().min(0).optional()
+    ),
+    pricePeriods: z.array(pricePeriodSchema).optional(),
+  })
+  .refine(d => d.bibTo === undefined || d.bibFrom === undefined || d.bibTo >= d.bibFrom, {
+    path: ['bibTo'],
+    message: 'Bib range end must be ≥ start',
+  })
+  .refine(d => d.maxAge === undefined || d.minAge === undefined || d.maxAge > d.minAge, {
+    path: ['maxAge'],
+    message: 'Max age must be greater than min age',
+  });
 
 const kidsDistanceSchema = z.object({
   id: z.string().optional(),

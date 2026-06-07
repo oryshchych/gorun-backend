@@ -32,6 +32,12 @@ export interface DistanceSpots {
   total?: number;
 }
 
+export interface PricePeriod {
+  from: Date;
+  to: Date;
+  price: number;
+}
+
 export interface Distance {
   id?: string;
   label?: string;
@@ -42,6 +48,30 @@ export interface Distance {
   elevation?: string;
   laps?: number | null;
   spots?: DistanceSpots;
+  /** Distance length in meters (canonical field; `km` kept for backward-compat) */
+  distanceMeters?: number;
+  /** Optional per-distance start time; falls back to event date when absent */
+  startAt?: Date;
+  /** Maximum number of participants on this distance */
+  participantLimit?: number;
+  /** Start of bib-number range assigned to this distance */
+  bibFrom?: number;
+  /** End of bib-number range assigned to this distance (inclusive) */
+  bibTo?: number;
+  /** Marks this as a kids' race; shown separately on public pages */
+  isKids?: boolean;
+  /** Discount % for pensioners (0–100) */
+  discountPensioner?: number;
+  /** Discount % for combat veterans / АТО-УБД (0–100) */
+  discountVeteran?: number;
+  /** Discount % for participants with disabilities (0–100) */
+  discountDisability?: number;
+  /** Minimum participant age */
+  minAge?: number;
+  /** Maximum participant age (no limit when absent) */
+  maxAge?: number;
+  /** Timed pricing tiers for this distance */
+  pricePeriods?: PricePeriod[];
 }
 
 export interface KidsDistance {
@@ -388,6 +418,27 @@ const eventSchema = new Schema<IEvent>(
               taken: { type: Number, min: 0 },
               total: { type: Number, min: 0 },
             },
+            default: undefined,
+          },
+          distanceMeters: { type: Number, min: 1 },
+          startAt: { type: Date },
+          participantLimit: { type: Number, min: 1 },
+          bibFrom: { type: Number, min: 0 },
+          bibTo: { type: Number, min: 0 },
+          isKids: { type: Boolean },
+          discountPensioner: { type: Number, min: 0, max: 100 },
+          discountVeteran: { type: Number, min: 0, max: 100 },
+          discountDisability: { type: Number, min: 0, max: 100 },
+          minAge: { type: Number, min: 0 },
+          maxAge: { type: Number, min: 0 },
+          pricePeriods: {
+            type: [
+              {
+                from: { type: Date, required: true },
+                to: { type: Date, required: true },
+                price: { type: Number, required: true, min: 0 },
+              },
+            ],
             default: undefined,
           },
         },
