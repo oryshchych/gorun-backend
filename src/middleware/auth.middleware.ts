@@ -90,7 +90,13 @@ export const optionalAuthenticate = async (
     const payload = verifyAccessToken(parts[1]);
 
     // Also load isAdmin so public list/detail routes can respect admin context
-    const user = await User.findById(payload.userId).select('isAdmin adminRole').lean();
+    const user = await User.findById(payload.userId).select('isAdmin adminRole deletedAt').lean();
+
+    // Soft-deleted accounts get no admin context (treated as unauthenticated below)
+    if (user?.deletedAt) {
+      next();
+      return;
+    }
 
     req.user = {
       userId: payload.userId,

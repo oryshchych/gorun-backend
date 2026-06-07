@@ -13,6 +13,7 @@ import cloudinaryRoutes from './routes/cloudinary.routes';
 import eventsRoutes from './routes/events.routes';
 import paymentsRoutes from './routes/payments.routes';
 import adminPromoCodesRoutes from './routes/admin.promoCodes.routes';
+import adminUsersRoutes from './routes/admin.users.routes';
 import promoCodeRoutes from './routes/promoCodes.routes';
 import registrationsRoutes from './routes/registrations.routes';
 import webhooksRoutes from './routes/webhooks.routes';
@@ -124,6 +125,9 @@ const createApp = (): Application => {
 
   // Admin: promo code management
   app.use('/api/admin/promo-codes', apiLimiter, adminPromoCodesRoutes);
+
+  // Admin: user management
+  app.use('/api/admin/users', apiLimiter, adminUsersRoutes);
 
   // Cloudinary routes
   app.use('/api/cloudinary', cloudinaryRoutes);

@@ -109,7 +109,7 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
  * Login with optional rememberMe (longer refresh token TTL).
  */
 export async function login(input: LoginInput): Promise<AuthResponse> {
-  const user = await User.findOne({ email: input.email.toLowerCase() });
+  const user = await User.findOne({ email: input.email.toLowerCase(), deletedAt: null });
   if (!user) {
     throw new UnauthorizedError(
       'Invalid email or password',
@@ -165,7 +165,8 @@ export async function refreshAccessToken(refreshTokenString: string): Promise<Au
   }
 
   const user = await User.findById(payload.userId);
-  if (!user) {
+  if (!user || user.deletedAt) {
+    await RefreshToken.deleteOne({ _id: storedToken._id });
     throw new NotFoundError('User not found', AUTH_CODES.ERROR_AUTH_USER_NOT_FOUND);
   }
 

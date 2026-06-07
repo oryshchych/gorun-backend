@@ -21,8 +21,8 @@ export const requireAdmin = async (
       return;
     }
 
-    const user = await User.findById(userId).select('isAdmin adminRole');
-    if (!user?.isAdmin) {
+    const user = await User.findById(userId).select('isAdmin adminRole deletedAt');
+    if (!user || user.deletedAt || !user.isAdmin) {
       next(new ForbiddenError('Admin access required', AUTH_CODES.ERROR_AUTH_ADMIN_REQUIRED));
       return;
     }

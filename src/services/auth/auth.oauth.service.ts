@@ -140,7 +140,7 @@ async function exchangeGoogleCode(
 }
 
 async function findOrCreateGoogleUser(info: GoogleUserInfo): Promise<IUser> {
-  let user = await User.findOne({ provider: 'google', providerId: info.sub });
+  let user = await User.findOne({ provider: 'google', providerId: info.sub, deletedAt: null });
   if (user) {
     if (info.picture && user.image !== info.picture) {
       user.image = info.picture;
@@ -149,7 +149,7 @@ async function findOrCreateGoogleUser(info: GoogleUserInfo): Promise<IUser> {
     return user;
   }
 
-  user = await User.findOne({ email: info.email!.toLowerCase() });
+  user = await User.findOne({ email: info.email!.toLowerCase(), deletedAt: null });
   if (user) {
     if (user.provider === 'credentials') {
       user.provider = 'google';

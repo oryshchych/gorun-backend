@@ -36,6 +36,8 @@ export interface IUser extends Document {
   isAdmin: boolean;
   adminRole?: UserAdminRole;
   kids?: KidProfile[];
+  /** Soft-delete marker. Null/absent means the account is active. */
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(password: string): Promise<boolean>;
@@ -146,6 +148,10 @@ const userSchema = new Schema<IUser>(
       ],
       default: undefined,
     },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -164,6 +170,8 @@ const userSchema = new Schema<IUser>(
 
 // Indexes
 userSchema.index({ email: 1 }, { unique: true });
+// Sparse index to speed up filtering out soft-deleted accounts
+userSchema.index({ deletedAt: 1 }, { sparse: true });
 // Partial index: only index documents where providerId exists and is not null
 // This prevents duplicate key errors for credentials users (who don't have providerId)
 userSchema.index(
