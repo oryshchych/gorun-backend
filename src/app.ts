@@ -143,7 +143,7 @@ const createApp = (): Application => {
   // Cloudinary routes
   app.use('/api/cloudinary', cloudinaryRoutes);
 
-  // Webhooks (no rate limit)
+  // Webhooks (rate-limited per-route inside webhooksRoutes)
   app.use('/api/webhooks', webhooksRoutes);
 
   // Apply 404 handler middleware for undefined routes

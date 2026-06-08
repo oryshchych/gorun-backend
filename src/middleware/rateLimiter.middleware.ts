@@ -56,6 +56,20 @@ export const registrationLimiter = rateLimit({
 });
 
 /**
+ * Rate limiter for webhook endpoints
+ * 30 requests per minute per IP — generous for legitimate payment processors,
+ * blocks automated forged-webhook abuse.
+ */
+export const webhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: 'Too many webhook requests from this IP, please try again in a minute',
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator,
+});
+
+/**
  * Rate limiter for promo code validation
  * 10 requests per minute per IP
  */

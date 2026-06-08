@@ -5,67 +5,85 @@ import { z } from 'zod';
 dotenv.config();
 
 // Define the schema for environment variables
-const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  PORT: z.string().default('5000').transform(Number).pipe(z.number().positive()),
-  MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
-  JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
-  JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
-  JWT_ACCESS_EXPIRY: z.string().default('15m'),
-  /** Short-lived refresh (login without remember-me, default rotation) */
-  JWT_REFRESH_EXPIRY: z.string().default('7d'),
-  /** Long-lived refresh when rememberMe / OAuth remember_me */
-  JWT_REFRESH_EXPIRY_LONG: z.string().default('30d'),
-  /** Password reset link TTL (e.g. 1h) */
-  PASSWORD_RESET_TOKEN_EXPIRY: z.string().default('1h'),
-  /** One-time OAuth exchange code TTL (seconds) */
-  OAUTH_EXCHANGE_CODE_TTL_SEC: z
-    .string()
-    .default('60')
-    .transform(Number)
-    .pipe(z.number().positive()),
-  /** OAuth CSRF state document TTL (minutes) */
-  OAUTH_STATE_TTL_MIN: z.string().default('10').transform(Number).pipe(z.number().positive()),
-  GOOGLE_CLIENT_ID: z.string().optional(),
-  GOOGLE_CLIENT_SECRET: z.string().optional(),
-  /** Backend callback URL registered in Google Cloud (e.g. http://localhost:5000/api/auth/google/callback) */
-  GOOGLE_OAUTH_REDIRECT_URI: z.string().optional(),
-  /**
-   * Comma-separated allowed origins for ?redirect_uri= on GET /auth/google (must match start of redirect URL).
-   * Defaults to FRONTEND_URL origin only.
-   */
-  FRONTEND_OAUTH_REDIRECT_ORIGINS: z.string().optional(),
-  CORS_ORIGIN: z
-    .string()
-    .default('http://localhost:3000')
-    .transform(v => v.trim())
-    .transform(v =>
-      v
-        .split(',')
-        .map(o => new URL(o).origin)
-        .join(',')
-    ),
-  RATE_LIMIT_WINDOW_MS: z.string().default('900000').transform(Number).pipe(z.number().positive()),
-  RATE_LIMIT_MAX_REQUESTS: z.string().default('100').transform(Number).pipe(z.number().positive()),
-  AUTH_RATE_LIMIT_MAX_REQUESTS: z
-    .string()
-    .default('5')
-    .transform(Number)
-    .pipe(z.number().positive()),
-  BCRYPT_SALT_ROUNDS: z.string().default('10').transform(Number).pipe(z.number().positive()),
-  LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
-  // Public registration MVP
-  PLATA_MONO_API_KEY: z.string().optional(),
-  PLATA_MONO_WEBHOOK_PUBLIC_KEY: z.string().optional(), // Base64-encoded public key from Monobank
-  PLATA_MONO_WEBHOOK_URL: z.string().default('http://localhost:5000/api/webhooks/plata-mono'),
-  RESEND_API_KEY: z.string().optional(),
-  RESEND_FROM_EMAIL: z.string().optional(),
-  FRONTEND_URL: z.string().default('http://localhost:3000'),
-  FRONTEND_SUCCESS_URL: z.string().default('http://localhost:3000/'),
-  FRONTEND_FAILURE_URL: z.string().default('http://localhost:3000/'),
-  SINGLE_EVENT_ID: z.string().optional(),
-  EVENT_BASE_PRICE: z.string().default('1000').transform(Number).pipe(z.number().nonnegative()),
-});
+const envSchema = z
+  .object({
+    NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+    PORT: z.string().default('5000').transform(Number).pipe(z.number().positive()),
+    MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
+    JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
+    JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
+    JWT_ACCESS_EXPIRY: z.string().default('15m'),
+    /** Short-lived refresh (login without remember-me, default rotation) */
+    JWT_REFRESH_EXPIRY: z.string().default('7d'),
+    /** Long-lived refresh when rememberMe / OAuth remember_me */
+    JWT_REFRESH_EXPIRY_LONG: z.string().default('30d'),
+    /** Password reset link TTL (e.g. 1h) */
+    PASSWORD_RESET_TOKEN_EXPIRY: z.string().default('1h'),
+    /** One-time OAuth exchange code TTL (seconds) */
+    OAUTH_EXCHANGE_CODE_TTL_SEC: z
+      .string()
+      .default('60')
+      .transform(Number)
+      .pipe(z.number().positive()),
+    /** OAuth CSRF state document TTL (minutes) */
+    OAUTH_STATE_TTL_MIN: z.string().default('10').transform(Number).pipe(z.number().positive()),
+    GOOGLE_CLIENT_ID: z.string().optional(),
+    GOOGLE_CLIENT_SECRET: z.string().optional(),
+    /** Backend callback URL registered in Google Cloud (e.g. http://localhost:5000/api/auth/google/callback) */
+    GOOGLE_OAUTH_REDIRECT_URI: z.string().optional(),
+    /**
+     * Comma-separated allowed origins for ?redirect_uri= on GET /auth/google (must match start of redirect URL).
+     * Defaults to FRONTEND_URL origin only.
+     */
+    FRONTEND_OAUTH_REDIRECT_ORIGINS: z.string().optional(),
+    CORS_ORIGIN: z
+      .string()
+      .default('http://localhost:3000')
+      .transform(v => v.trim())
+      .transform(v =>
+        v
+          .split(',')
+          .map(o => new URL(o).origin)
+          .join(',')
+      ),
+    RATE_LIMIT_WINDOW_MS: z
+      .string()
+      .default('900000')
+      .transform(Number)
+      .pipe(z.number().positive()),
+    RATE_LIMIT_MAX_REQUESTS: z
+      .string()
+      .default('100')
+      .transform(Number)
+      .pipe(z.number().positive()),
+    AUTH_RATE_LIMIT_MAX_REQUESTS: z
+      .string()
+      .default('5')
+      .transform(Number)
+      .pipe(z.number().positive()),
+    BCRYPT_SALT_ROUNDS: z.string().default('10').transform(Number).pipe(z.number().positive()),
+    LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
+    // Public registration MVP
+    PLATA_MONO_API_KEY: z.string().optional(),
+    PLATA_MONO_WEBHOOK_PUBLIC_KEY: z.string().optional(),
+    PLATA_MONO_WEBHOOK_URL: z.string().default('http://localhost:5000/api/webhooks/plata-mono'),
+    RESEND_API_KEY: z.string().optional(),
+    RESEND_FROM_EMAIL: z.string().optional(),
+    FRONTEND_URL: z.string().default('http://localhost:3000'),
+    FRONTEND_SUCCESS_URL: z.string().default('http://localhost:3000/'),
+    FRONTEND_FAILURE_URL: z.string().default('http://localhost:3000/'),
+    SINGLE_EVENT_ID: z.string().optional(),
+    EVENT_BASE_PRICE: z.string().default('1000').transform(Number).pipe(z.number().nonnegative()),
+  })
+  .superRefine((data, ctx) => {
+    if (data.NODE_ENV === 'production' && !data.PLATA_MONO_WEBHOOK_PUBLIC_KEY) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'PLATA_MONO_WEBHOOK_PUBLIC_KEY is required in production',
+        path: ['PLATA_MONO_WEBHOOK_PUBLIC_KEY'],
+      });
+    }
+  });
 
 // Validate environment variables
 const parseEnv = () => {

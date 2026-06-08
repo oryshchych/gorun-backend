@@ -13,8 +13,8 @@ import { plataWebhookSchema } from '../validators/webhooks.validator';
  * Documentation: https://monobank.ua/api-docs/acquiring/dev/webhooks/verify
  */
 const verifySignature = (rawBody: string, signatureHeader?: string): boolean => {
-  // If no public key configured, skip verification (for development)
-  if (!paymentConfig.plataWebhookPublicKey) return true;
+  // No key configured — fail closed; never accept unverifiable webhooks
+  if (!paymentConfig.plataWebhookPublicKey) return false;
   if (!signatureHeader) return false;
 
   try {
