@@ -176,6 +176,35 @@ Every domain requires exactly 6 artifacts, always created together:
 
 Also add domain codes to `src/types/codes.ts` following the `DOMAIN_CODES` const pattern.
 
+### Audit logging — required for every mutation
+
+**Every controller that creates, updates, or deletes a resource must call `writeAuditLog()` after the successful operation.** This applies to new routes as well as edits to existing ones.
+
+```typescript
+import { writeAuditLog } from '../utils/audit.util';
+
+// In the controller, after the service call succeeds:
+void writeAuditLog({
+  req,
+  action: 'CREATE', // CREATE | UPDATE | DELETE | STATUS_CHANGE | CANCEL
+  entity: 'Event', // Event | Registration | User | PromoCode
+  entityId: created.id,
+  entityLabel: created.title ?? created.id,
+  // For UPDATE/DELETE: fetch the raw document with .lean() BEFORE the service call
+  before: (beforeDoc ?? {}) as Record<string, unknown>,
+  after: (afterDoc ?? {}) as Record<string, unknown>,
+});
+```
+
+Rules:
+
+- `writeAuditLog` **never throws** — it catches internally and logs the error via Winston. Do not await it in a try/catch.
+- For CREATE: pass only `after` (no `before`).
+- For DELETE: pass only `before` (fetched before the delete).
+- For UPDATE: fetch the raw document with `.lean()` before the service call, re-fetch after, pass both.
+- `entityLabel` should be a human-readable identifier (event title, user email, promo code string, etc.).
+- The full implementation lives in `src/utils/audit.util.ts`. Entities are typed in `src/models/AuditLog.ts`.
+
 ### Route middleware chain (canonical pattern)
 
 ```typescript
