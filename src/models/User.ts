@@ -38,6 +38,10 @@ export interface IUser extends Document {
   kids?: KidProfile[];
   /** Soft-delete marker. Null/absent means the account is active. */
   deletedAt?: Date | null;
+  /** Number of consecutive failed login attempts since last successful login. */
+  failedLoginAttempts: number;
+  /** Account locked until this timestamp after too many failed attempts. */
+  lockedUntil?: Date | null;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(password: string): Promise<boolean>;
@@ -149,6 +153,14 @@ const userSchema = new Schema<IUser>(
       default: undefined,
     },
     deletedAt: {
+      type: Date,
+      default: null,
+    },
+    failedLoginAttempts: {
+      type: Number,
+      default: 0,
+    },
+    lockedUntil: {
       type: Date,
       default: null,
     },

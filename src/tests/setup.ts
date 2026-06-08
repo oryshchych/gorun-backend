@@ -4,6 +4,10 @@ import mongoose from 'mongoose';
 // Set up test environment variables
 process.env.NODE_ENV = 'test';
 process.env.MONGODB_URI = 'mongodb://localhost:27017/test';
+// Disable IP-based rate limiters in tests — each test file shares an in-memory
+// store, so a real limit would fire and cause false 429s in the test suite.
+process.env.AUTH_RATE_LIMIT_MAX_REQUESTS = '99999';
+process.env.RATE_LIMIT_MAX_REQUESTS = '99999';
 process.env.JWT_ACCESS_SECRET = 'test-access-secret-key-for-testing-only';
 process.env.JWT_REFRESH_SECRET = 'test-refresh-secret-key-for-testing-only';
 process.env.JWT_ACCESS_EXPIRY = '15m';

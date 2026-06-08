@@ -105,23 +105,63 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
   };
 }
 
+const MAX_FAILED_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
 /**
  * Login with optional rememberMe (longer refresh token TTL).
+ * Tracks failed attempts per account and locks after MAX_FAILED_LOGIN_ATTEMPTS.
  */
 export async function login(input: LoginInput): Promise<AuthResponse> {
   const user = await User.findOne({ email: input.email.toLowerCase(), deletedAt: null });
   if (!user) {
+    // Constant-time response to avoid email enumeration
     throw new UnauthorizedError(
       'Invalid email or password',
       AUTH_CODES.ERROR_AUTH_INVALID_CREDENTIALS
     );
   }
 
+  // Reject immediately if account is locked
+  if (user.lockedUntil && user.lockedUntil > new Date()) {
+    const retryAfterSec = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 1000);
+    logger.warn('Login attempt on locked account', {
+      userId: user._id.toString(),
+      lockedUntil: user.lockedUntil,
+    });
+    throw new UnauthorizedError(
+      `Account is temporarily locked. Try again in ${Math.ceil(retryAfterSec / 60)} minute(s).`,
+      AUTH_CODES.ERROR_AUTH_ACCOUNT_LOCKED
+    );
+  }
+
   const isPasswordValid = await user.comparePassword(input.password);
+
   if (!isPasswordValid) {
+    const attempts = (user.failedLoginAttempts ?? 0) + 1;
+    const update: { failedLoginAttempts: number; lockedUntil?: Date } = {
+      failedLoginAttempts: attempts,
+    };
+    if (attempts >= MAX_FAILED_LOGIN_ATTEMPTS) {
+      update.lockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MS);
+      logger.warn('Account locked after repeated failed logins', {
+        userId: user._id.toString(),
+        attempts,
+      });
+    }
+    await User.updateOne({ _id: user._id }, { $set: update });
+
     throw new UnauthorizedError(
       'Invalid email or password',
       AUTH_CODES.ERROR_AUTH_INVALID_CREDENTIALS
+    );
+  }
+
+  // Successful login — clear any lockout state
+  if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+    await User.updateOne(
+      { _id: user._id },
+      { $set: { failedLoginAttempts: 0, lockedUntil: null } }
     );
   }
 

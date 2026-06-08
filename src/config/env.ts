@@ -58,11 +58,13 @@ const envSchema = z
       .pipe(z.number().positive()),
     AUTH_RATE_LIMIT_MAX_REQUESTS: z
       .string()
-      .default('5')
+      .default('10')
       .transform(Number)
       .pipe(z.number().positive()),
     BCRYPT_SALT_ROUNDS: z.string().default('10').transform(Number).pipe(z.number().positive()),
     LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
+    // Phase 4: set this to enable Redis-backed rate limiting and caching
+    REDIS_URL: z.string().url().optional(),
     // Public registration MVP
     PLATA_MONO_API_KEY: z.string().optional(),
     PLATA_MONO_WEBHOOK_PUBLIC_KEY: z.string().optional(),

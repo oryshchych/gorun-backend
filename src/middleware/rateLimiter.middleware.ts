@@ -1,45 +1,46 @@
 import { Request } from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import { rateLimitConfig } from '../config/env';
+
+// Phase 4: replace with a Redis-backed store when REDIS_URL is provisioned.
+// Until then, express-rate-limit defaults to in-memory (fine for single-instance).
+// const store = createRedisStore(process.env.REDIS_URL);
 
 /**
- * Custom key generator that uses express-rate-limit's ipKeyGenerator helper
- * This properly handles IPv6 addresses and prevents bypassing rate limits
- * With trust proxy set to 1, Express only trusts the first X-Forwarded-For header
+ * Custom key generator that uses express-rate-limit's ipKeyGenerator helper.
+ * Properly handles IPv6 and prevents header-spoofing when trust proxy is set.
  */
 const keyGenerator = (req: Request): string => {
   const ip = req.ip || req.socket?.remoteAddress || 'unknown';
-  // Use express-rate-limit's ipKeyGenerator helper for proper IPv6 handling
   return ipKeyGenerator(ip);
 };
 
 /**
- * Rate limiter for authentication endpoints
- * Limits to 5 requests per 15 minutes per IP address
- * Requirements: 2.5, 17.2
+ * Rate limiter for authentication endpoints.
+ * 10 attempts per 15 minutes per IP; successful requests are not counted so
+ * legitimate users are not penalised for normal activity.
  */
 export const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 500, // Limit each IP to 5 requests per windowMs
+  windowMs: rateLimitConfig.windowMs,
+  max: rateLimitConfig.authMaxRequests,
   message: 'Too many authentication attempts from this IP, please try again after 15 minutes',
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  skipSuccessfulRequests: false, // Count all requests, not just failed ones
-  keyGenerator, // Use custom key generator to prevent IP spoofing
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  keyGenerator,
 });
 
 /**
- * Rate limiter for general API endpoints
- * Limits to 100 requests per 15 minutes per IP address
- * Requirements: 17.1
+ * Rate limiter for general API endpoints.
+ * 100 requests per 15 minutes per IP.
  */
 export const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // Limit each IP to 100 requests per windowMs
+  windowMs: rateLimitConfig.windowMs,
+  max: rateLimitConfig.maxRequests,
   message: 'Too many requests from this IP, please try again after 15 minutes',
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  skipSuccessfulRequests: false, // Count all requests
-  keyGenerator, // Use custom key generator to prevent IP spoofing
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator,
 });
 
 /**
