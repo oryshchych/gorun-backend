@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { frontendConfig } from '../config/env';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { User } from '../models/User';
+import { writeAuditLog } from '../utils/audit.util';
 import {
   exchangeOAuthCode,
   handleGoogleCallback,
@@ -104,7 +106,19 @@ export const patchMe = async (req: AuthRequest, res: Response): Promise<void> =>
   const userId = req.user!.userId;
   const body = req.body as UpdateProfileInput;
 
+  const before = await User.findById(userId).lean();
   const user = await authService.updateProfile(userId, body);
+  const after = await User.findById(userId).lean();
+
+  void writeAuditLog({
+    req,
+    action: 'UPDATE',
+    entity: 'User',
+    entityId: userId,
+    entityLabel: (before as { email?: string } | null)?.email ?? userId,
+    before: (before ?? {}) as Record<string, unknown>,
+    after: (after ?? {}) as Record<string, unknown>,
+  });
 
   res.status(200).json({
     success: true,

@@ -39,6 +39,7 @@ export const AUTH_CODES = {
   ERROR_AUTH_USER_NOT_FOUND: 'ERROR_AUTH_USER_NOT_FOUND',
   ERROR_AUTH_RESET_TOKEN_INVALID: 'ERROR_AUTH_RESET_TOKEN_INVALID',
   ERROR_AUTH_ADMIN_REQUIRED: 'ERROR_AUTH_ADMIN_REQUIRED',
+  ERROR_AUTH_SUPER_ADMIN_REQUIRED: 'ERROR_AUTH_SUPER_ADMIN_REQUIRED',
 } as const;
 
 // ============================================================================
@@ -176,6 +177,15 @@ export const ADMIN_REGISTRATIONS_CODES = {
 } as const;
 
 // ============================================================================
+// AUDIT LOGS CODES
+// ============================================================================
+
+export const AUDIT_LOGS_CODES = {
+  SUCCESS_AUDIT_LOGS_RETRIEVED: 'SUCCESS_AUDIT_LOGS_RETRIEVED',
+  ERROR_AUDIT_LOGS_FORBIDDEN: 'ERROR_AUDIT_LOGS_FORBIDDEN',
+} as const;
+
+// ============================================================================
 // VALIDATION CODES
 // ============================================================================
 
@@ -222,6 +232,7 @@ export const API_CODES = {
   ...PROMO_CODES_CODES,
   ...ADMIN_USERS_CODES,
   ...ADMIN_REGISTRATIONS_CODES,
+  ...AUDIT_LOGS_CODES,
   ...VALIDATION_CODES,
   ...GENERAL_CODES,
 } as const;

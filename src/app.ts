@@ -15,6 +15,7 @@ import paymentsRoutes from './routes/payments.routes';
 import adminPromoCodesRoutes from './routes/admin.promoCodes.routes';
 import adminRegistrationsRoutes from './routes/admin.registrations.routes';
 import adminUsersRoutes from './routes/admin.users.routes';
+import adminAuditLogsRoutes from './routes/adminAuditLogs.routes';
 import promoCodeRoutes from './routes/promoCodes.routes';
 import registrationsRoutes from './routes/registrations.routes';
 import webhooksRoutes from './routes/webhooks.routes';
@@ -132,6 +133,9 @@ const createApp = (): Application => {
 
   // Admin: registration management
   app.use('/api/admin/registrations', apiLimiter, adminRegistrationsRoutes);
+
+  // Admin: audit logs (super_admin only)
+  app.use('/api/admin/audit-logs', apiLimiter, adminAuditLogsRoutes);
 
   // Cloudinary routes
   app.use('/api/cloudinary', cloudinaryRoutes);

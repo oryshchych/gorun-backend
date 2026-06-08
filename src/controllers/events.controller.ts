@@ -1,12 +1,14 @@
 import { Request, Response } from 'express';
 import type { z } from 'zod';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { Event } from '../models/Event';
 import eventsService, {
   CreateEventInput,
   EventFilters,
   UpdateEventInput,
 } from '../services/events/events.service';
 import { pickDefined } from '../utils/pickDefined.util';
+import { writeAuditLog } from '../utils/audit.util';
 import { getEventsQuerySchema } from '../validators/events.validator';
 
 type GetEventsQuery = z.infer<typeof getEventsQuerySchema>;
@@ -106,6 +108,18 @@ export const createEvent = async (req: AuthRequest, res: Response): Promise<void
 
   const event = await eventsService.createEvent(userId, input, isAdmin);
 
+  void writeAuditLog({
+    req,
+    action: 'CREATE',
+    entity: 'Event',
+    entityId: (event as { id?: string; _id?: { toString(): string } }).id ?? '',
+    entityLabel:
+      (event as { title?: string; resolvedTitle?: string }).resolvedTitle ??
+      (event as { title?: string }).title ??
+      'Event',
+    after: event as unknown as Record<string, unknown>,
+  });
+
   res.status(201).json({
     success: true,
     data: event,
@@ -121,11 +135,23 @@ export const updateEvent = async (req: AuthRequest, res: Response): Promise<void
   const userId = req.user!.userId;
   const isAdmin = req.user?.isAdmin ?? false;
 
-  // The validator already coerces `date` to a Date and strips unknown keys, so
-  // the validated body maps cleanly onto UpdateEventInput's defined fields.
+  const before = await Event.findById(id).lean();
   const updateData = pickDefined<UpdateEventInput>(req.body);
-
   const event = await eventsService.updateEvent(id, userId, updateData, isAdmin);
+  const after = await Event.findById(id).lean();
+
+  void writeAuditLog({
+    req,
+    action: 'UPDATE',
+    entity: 'Event',
+    entityId: id,
+    entityLabel:
+      (event as { resolvedTitle?: string; title?: string }).resolvedTitle ??
+      (event as { title?: string }).title ??
+      id,
+    before: (before ?? {}) as Record<string, unknown>,
+    after: (after ?? {}) as Record<string, unknown>,
+  });
 
   res.status(200).json({
     success: true,
@@ -150,7 +176,17 @@ export const deleteEvent = async (req: AuthRequest, res: Response): Promise<void
     return;
   }
 
+  const before = await Event.findById(id).lean();
   await eventsService.deleteEvent(id, userId, isAdmin);
+
+  void writeAuditLog({
+    req,
+    action: 'DELETE',
+    entity: 'Event',
+    entityId: id,
+    entityLabel: (before as { title?: string } | null)?.title ?? id,
+    before: (before ?? {}) as Record<string, unknown>,
+  });
 
   res.status(204).send();
 };

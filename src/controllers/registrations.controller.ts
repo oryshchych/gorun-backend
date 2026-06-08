@@ -1,8 +1,10 @@
 import { Request, Response } from 'express';
 import type { z } from 'zod';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { Registration } from '../models/Registration';
 import registrationsService from '../services/registrations/registrations.service';
 import { REGISTRATIONS_CODES } from '../types/codes';
+import { writeAuditLog } from '../utils/audit.util';
 import { getRegistrationsQuerySchema } from '../validators/registrations.validator';
 
 type GetRegistrationsQuery = z.infer<typeof getRegistrationsQuerySchema>;
@@ -128,7 +130,22 @@ export const cancelRegistration = async (req: AuthRequest, res: Response): Promi
     return;
   }
 
+  const before = await Registration.findById(id).lean();
   await registrationsService.cancelRegistration(id, userId);
+  const after = await Registration.findById(id).lean();
+
+  void writeAuditLog({
+    req,
+    action: 'CANCEL',
+    entity: 'Registration',
+    entityId: id,
+    entityLabel:
+      (before as { email?: string; name?: string } | null)?.email ??
+      (before as { name?: string } | null)?.name ??
+      id,
+    before: (before ?? {}) as Record<string, unknown>,
+    after: (after ?? {}) as Record<string, unknown>,
+  });
 
   res.status(200).json({
     success: true,
