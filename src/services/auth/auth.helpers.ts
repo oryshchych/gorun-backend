@@ -4,6 +4,7 @@ import { IUser } from '../../models/User';
 import { RefreshToken } from '../../models/RefreshToken';
 import { expiryToDate } from '../../utils/time.util';
 import { generateRefreshToken } from '../../utils/jwt.util';
+import { sha256Hex } from './auth.crypto';
 import type { KidProfileResponse, ProfileGender, UserResponse } from './auth.types';
 
 export function formatUserResponse(
@@ -60,7 +61,7 @@ export async function persistRefreshToken(
   const expiresAt = expiryToDate(expiryStr);
   await RefreshToken.create({
     userId,
-    token: refreshTokenJwt,
+    token: sha256Hex(refreshTokenJwt), // store hash; plaintext JWT is never persisted
     expiresAt,
     longLived,
   });

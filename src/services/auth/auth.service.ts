@@ -179,6 +179,8 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
 
 /**
  * Refresh access token; preserves short vs long refresh TTL based on stored session.
+ * Tokens are looked up by sha256 hash. Presenting a valid-but-already-used token
+ * triggers reuse detection: all sessions for the user are revoked immediately.
  */
 export async function refreshAccessToken(refreshTokenString: string): Promise<AuthResponse> {
   let payload;
@@ -191,10 +193,19 @@ export async function refreshAccessToken(refreshTokenString: string): Promise<Au
     );
   }
 
-  const storedToken = await RefreshToken.findOne({ token: refreshTokenString });
+  const tokenHash = sha256Hex(refreshTokenString);
+  const storedToken = await RefreshToken.findOne({ token: tokenHash });
+
   if (!storedToken) {
+    // The JWT is cryptographically valid but the hash is not in the DB.
+    // This means it was already used (rotated) or revoked. Revoke all
+    // sessions for this user to contain any potential token theft.
+    logger.warn('Possible refresh token reuse — revoking all sessions', {
+      userId: payload.userId,
+    });
+    await RefreshToken.deleteMany({ userId: payload.userId });
     throw new UnauthorizedError(
-      'Refresh token not found or has been revoked',
+      'Refresh token has already been used or revoked',
       AUTH_CODES.ERROR_AUTH_REFRESH_TOKEN_INVALID
     );
   }
@@ -225,7 +236,8 @@ export async function refreshAccessToken(refreshTokenString: string): Promise<Au
 }
 
 export async function logout(refreshTokenString: string): Promise<void> {
-  const result = await RefreshToken.deleteOne({ token: refreshTokenString });
+  const tokenHash = sha256Hex(refreshTokenString);
+  const result = await RefreshToken.deleteOne({ token: tokenHash });
 
   if (result.deletedCount === 0) {
     throw new NotFoundError('Refresh token not found', AUTH_CODES.ERROR_AUTH_REFRESH_TOKEN_INVALID);
