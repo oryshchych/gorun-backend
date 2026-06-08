@@ -159,6 +159,23 @@ export const ADMIN_USERS_CODES = {
 } as const;
 
 // ============================================================================
+// ADMIN REGISTRATIONS CODES
+// ============================================================================
+
+export const ADMIN_REGISTRATIONS_CODES = {
+  // Success codes
+  SUCCESS_ADMIN_REGISTRATIONS_LIST_RETRIEVED: 'SUCCESS_ADMIN_REGISTRATIONS_LIST_RETRIEVED',
+  SUCCESS_ADMIN_REGISTRATION_RETRIEVED: 'SUCCESS_ADMIN_REGISTRATION_RETRIEVED',
+  SUCCESS_ADMIN_REGISTRATION_CANCELLED: 'SUCCESS_ADMIN_REGISTRATION_CANCELLED',
+  SUCCESS_ADMIN_REGISTRATIONS_EXPORTED: 'SUCCESS_ADMIN_REGISTRATIONS_EXPORTED',
+
+  // Error codes
+  ERROR_ADMIN_REGISTRATION_NOT_FOUND: 'ERROR_ADMIN_REGISTRATION_NOT_FOUND',
+  ERROR_ADMIN_REGISTRATION_INVALID_ID: 'ERROR_ADMIN_REGISTRATION_INVALID_ID',
+  ERROR_ADMIN_REGISTRATION_ALREADY_CANCELLED: 'ERROR_ADMIN_REGISTRATION_ALREADY_CANCELLED',
+} as const;
+
+// ============================================================================
 // VALIDATION CODES
 // ============================================================================
 
@@ -204,6 +221,7 @@ export const API_CODES = {
   ...PAYMENTS_CODES,
   ...PROMO_CODES_CODES,
   ...ADMIN_USERS_CODES,
+  ...ADMIN_REGISTRATIONS_CODES,
   ...VALIDATION_CODES,
   ...GENERAL_CODES,
 } as const;
