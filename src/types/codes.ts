@@ -177,6 +177,21 @@ export const ADMIN_REGISTRATIONS_CODES = {
 } as const;
 
 // ============================================================================
+// ADMIN ANALYTICS CODES
+// ============================================================================
+
+export const ADMIN_ANALYTICS_CODES = {
+  // Success codes
+  SUCCESS_ANALYTICS_SUMMARY_RETRIEVED: 'SUCCESS_ANALYTICS_SUMMARY_RETRIEVED',
+  SUCCESS_ANALYTICS_TIMESERIES_RETRIEVED: 'SUCCESS_ANALYTICS_TIMESERIES_RETRIEVED',
+  SUCCESS_ANALYTICS_DEMOGRAPHICS_RETRIEVED: 'SUCCESS_ANALYTICS_DEMOGRAPHICS_RETRIEVED',
+  SUCCESS_ANALYTICS_BY_EVENT_RETRIEVED: 'SUCCESS_ANALYTICS_BY_EVENT_RETRIEVED',
+
+  // Error codes
+  ERROR_ANALYTICS_INVALID_RANGE: 'ERROR_ANALYTICS_INVALID_RANGE',
+} as const;
+
+// ============================================================================
 // AUDIT LOGS CODES
 // ============================================================================
 
@@ -232,6 +247,7 @@ export const API_CODES = {
   ...PROMO_CODES_CODES,
   ...ADMIN_USERS_CODES,
   ...ADMIN_REGISTRATIONS_CODES,
+  ...ADMIN_ANALYTICS_CODES,
   ...AUDIT_LOGS_CODES,
   ...VALIDATION_CODES,
   ...GENERAL_CODES,

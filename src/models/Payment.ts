@@ -69,5 +69,7 @@ const paymentSchema = new Schema<IPayment>(
 paymentSchema.index({ registrationId: 1 });
 paymentSchema.index({ plataMonoInvoiceId: 1 });
 paymentSchema.index({ status: 1 });
+// Analytics: payments-by-day filters on status + createdAt.
+paymentSchema.index({ status: 1, createdAt: 1 });
 
 export const Payment = mongoose.model<IPayment>('Payment', paymentSchema);

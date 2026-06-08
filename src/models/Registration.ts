@@ -182,6 +182,10 @@ registrationSchema.index({ userId: 1 });
 registrationSchema.index({ status: 1 });
 registrationSchema.index({ paymentStatus: 1 });
 registrationSchema.index({ promoCodeId: 1 });
+// Analytics: every dashboard aggregation ranges on registeredAt.
+registrationSchema.index({ registeredAt: 1 });
+registrationSchema.index({ eventId: 1, registeredAt: 1 });
+registrationSchema.index({ userId: 1, registeredAt: 1 });
 
 // Virtual for event population
 registrationSchema.virtual('event', {
