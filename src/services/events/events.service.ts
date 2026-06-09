@@ -62,6 +62,8 @@ type EventDoc = {
   organizerInfo?: string;
   organizerContactName?: string;
   organizerContactInfo?: string;
+  changeFee?: number;
+  transferFee?: number;
   imageUrl?:
     | {
         portrait: string;
@@ -252,6 +254,8 @@ function formatEventResponse(event: EventDoc, lang?: 'en' | 'uk'): EventResponse
   if (event.organizerContactInfo !== undefined) {
     response.organizerContactInfo = event.organizerContactInfo;
   }
+  if (event.changeFee !== undefined) response.changeFee = event.changeFee;
+  if (event.transferFee !== undefined) response.transferFee = event.transferFee;
   if (event.registrationStart !== undefined) response.registrationStart = event.registrationStart;
   if (event.registrationEnd !== undefined) response.registrationEnd = event.registrationEnd;
   if (event.socials !== undefined) response.socials = event.socials;
@@ -393,6 +397,8 @@ function mergeTranslationsForUpdate(
     updateFields.organizerContactName = input.organizerContactName;
   if (input.organizerContactInfo !== undefined)
     updateFields.organizerContactInfo = input.organizerContactInfo;
+  if (input.changeFee !== undefined) updateFields.changeFee = input.changeFee;
+  if (input.transferFee !== undefined) updateFields.transferFee = input.transferFee;
   if (input.registrationStart !== undefined)
     updateFields.registrationStart = input.registrationStart;
   if (input.registrationEnd !== undefined) updateFields.registrationEnd = input.registrationEnd;
@@ -589,6 +595,8 @@ export async function createEvent(
     organizerInfo: input.organizerInfo,
     organizerContactName: input.organizerContactName,
     organizerContactInfo: input.organizerContactInfo,
+    changeFee: input.changeFee,
+    transferFee: input.transferFee,
     registrationStart: input.registrationStart,
     registrationEnd: input.registrationEnd,
     socials: input.socials,

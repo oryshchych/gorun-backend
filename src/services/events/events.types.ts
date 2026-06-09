@@ -66,6 +66,8 @@ export interface CreateEventInput {
   organizerInfo?: string;
   organizerContactName?: string;
   organizerContactInfo?: string;
+  changeFee?: number;
+  transferFee?: number;
 }
 
 export interface UpdateEventInput {
@@ -112,6 +114,8 @@ export interface UpdateEventInput {
   organizerInfo?: string;
   organizerContactName?: string;
   organizerContactInfo?: string;
+  changeFee?: number;
+  transferFee?: number;
 }
 
 export interface EventFilters {
@@ -188,4 +192,6 @@ export interface EventResponse {
   organizerInfo?: string;
   organizerContactName?: string;
   organizerContactInfo?: string;
+  changeFee?: number;
+  transferFee?: number;
 }

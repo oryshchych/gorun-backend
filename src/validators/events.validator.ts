@@ -269,6 +269,8 @@ export const createEventSchema = z.object({
   organizerInfo: z.string().trim().max(300).optional(),
   organizerContactName: z.string().trim().max(200).optional(),
   organizerContactInfo: z.string().trim().max(500).optional(),
+  changeFee: z.number().nonnegative().optional(),
+  transferFee: z.number().nonnegative().optional(),
 });
 
 export const updateEventSchema = z.object({
@@ -335,6 +337,8 @@ export const updateEventSchema = z.object({
   organizerInfo: z.string().trim().max(300).optional(),
   organizerContactName: z.string().trim().max(200).optional(),
   organizerContactInfo: z.string().trim().max(500).optional(),
+  changeFee: z.number().nonnegative().optional(),
+  transferFee: z.number().nonnegative().optional(),
 });
 
 export const eventIdSchema = z.object({

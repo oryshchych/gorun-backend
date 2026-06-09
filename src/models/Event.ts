@@ -152,6 +152,8 @@ export interface IEvent extends Document {
   organizerInfo?: string;
   organizerContactName?: string;
   organizerContactInfo?: string;
+  changeFee?: number;
+  transferFee?: number;
   createdAt: Date;
   updatedAt: Date;
   hasAvailableCapacity(): boolean;
@@ -497,6 +499,8 @@ const eventSchema = new Schema<IEvent>(
     organizerInfo: { type: String, trim: true },
     organizerContactName: { type: String, trim: true },
     organizerContactInfo: { type: String, trim: true },
+    changeFee: { type: Number, min: 0 },
+    transferFee: { type: Number, min: 0 },
   } as Record<string, unknown>,
   {
     timestamps: true,
