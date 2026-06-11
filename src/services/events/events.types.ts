@@ -109,7 +109,7 @@ export interface UpdateEventInput {
   registrationStart?: Date;
   registrationEnd?: Date;
   socials?: { instagram?: string; facebook?: string; telegram?: string };
-  regulationUrl?: string;
+  regulationUrl?: string | null;
   scheduleText?: string;
   organizerInfo?: string;
   organizerContactName?: string;

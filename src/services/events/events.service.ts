@@ -403,7 +403,9 @@ function mergeTranslationsForUpdate(
     updateFields.registrationStart = input.registrationStart;
   if (input.registrationEnd !== undefined) updateFields.registrationEnd = input.registrationEnd;
   if (input.socials !== undefined) updateFields.socials = input.socials;
-  if (input.regulationUrl !== undefined) updateFields.regulationUrl = input.regulationUrl;
+  if (input.regulationUrl !== undefined && input.regulationUrl !== null) {
+    updateFields.regulationUrl = input.regulationUrl;
+  }
   if (input.scheduleText !== undefined) updateFields.scheduleText = input.scheduleText;
 
   return { updateFields };
@@ -640,9 +642,15 @@ export async function updateEvent(
   // Use $set so Mongoose only validates the fields being changed.
   // This avoids required-field errors on pre-existing documents that have
   // missing/null fields (e.g. organizerId) we are not touching.
+  const unsetFields: Record<string, 1> = {};
+  if (input.regulationUrl === null) unsetFields['regulationUrl'] = 1;
+
   const updated = await Event.findByIdAndUpdate(
     id,
-    { $set: merged.updateFields },
+    {
+      $set: merged.updateFields,
+      ...(Object.keys(unsetFields).length > 0 ? { $unset: unsetFields } : {}),
+    },
     { new: true, runValidators: false }
   )
     .populate('organizer', 'name email image')

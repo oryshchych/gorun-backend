@@ -332,7 +332,10 @@ export const updateEventSchema = z.object({
       telegram: z.string().trim().optional().or(z.literal('')),
     })
     .optional(),
-  regulationUrl: optionalUrl('Regulation URL must be a valid URL'),
+  regulationUrl: z.preprocess(
+    val => (val === '' ? null : val),
+    z.string().url('Regulation URL must be a valid URL').nullable().optional()
+  ),
   scheduleText: z.string().max(5000).optional(),
   organizerInfo: z.string().trim().max(300).optional(),
   organizerContactName: z.string().trim().max(200).optional(),
