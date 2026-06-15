@@ -168,4 +168,31 @@ describe('Event auxiliary fields (socials, regulationUrl, scheduleText, registra
     // untouched aux fields survive the partial update
     expect(getRes.body.data.socials).toMatchObject({ instagram: 'https://instagram.com/run' });
   });
+
+  it('rejects a non-PDF regulationUrl on create', async () => {
+    await request(app)
+      .post('/api/events')
+      .set('Authorization', auth)
+      .send({ ...baseBody, regulationUrl: 'https://example.com/regulation.docx' })
+      .expect(400);
+  });
+
+  it('clears regulationUrl when an empty string is sent on update', async () => {
+    const created = await request(app)
+      .post('/api/events')
+      .set('Authorization', auth)
+      .send(baseBody)
+      .expect(201);
+
+    const { id } = created.body.data;
+
+    await request(app)
+      .put(`/api/events/${id}`)
+      .set('Authorization', auth)
+      .send({ regulationUrl: '' })
+      .expect(200);
+
+    const getRes = await request(app).get(`/api/events/${id}`).expect(200);
+    expect(getRes.body.data.regulationUrl).toBeUndefined();
+  });
 });

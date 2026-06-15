@@ -114,6 +114,36 @@ const distanceSpotsSchema = z.object({
 const optionalUrl = (message: string) =>
   z.preprocess(val => (val === '' ? undefined : val), z.string().url({ message }).optional());
 
+/** True when the URL path ends in `.pdf` (query string / fragment ignored). */
+const isPdfUrl = (url: string): boolean => {
+  try {
+    return new URL(url).pathname.toLowerCase().endsWith('.pdf');
+  } catch {
+    return false;
+  }
+};
+
+/** Regulation URL on CREATE: optional, must be a valid PDF URL when present. */
+const regulationUrlCreate = z.preprocess(
+  val => (val === '' ? undefined : val),
+  z
+    .string()
+    .url({ message: 'Regulation URL must be a valid URL' })
+    .refine(isPdfUrl, { message: 'Regulation must be a PDF file' })
+    .optional()
+);
+
+/** Regulation URL on UPDATE: empty string → null (clears the field). */
+const regulationUrlUpdate = z.preprocess(
+  val => (val === '' ? null : val),
+  z
+    .string()
+    .url({ message: 'Regulation URL must be a valid URL' })
+    .refine(isPdfUrl, { message: 'Regulation must be a PDF file' })
+    .nullable()
+    .optional()
+);
+
 /** Accepts a number, null, or empty string; empty string/null → null. */
 const optionalNumericOrEmpty = z.preprocess(
   val => (val === '' || val === null ? null : val),
@@ -264,7 +294,7 @@ export const createEventSchema = z.object({
       telegram: z.string().trim().optional().or(z.literal('')),
     })
     .optional(),
-  regulationUrl: optionalUrl('Regulation URL must be a valid URL'),
+  regulationUrl: regulationUrlCreate,
   scheduleText: z.string().max(5000).optional(),
   organizerInfo: z.string().trim().max(300).optional(),
   organizerContactName: z.string().trim().max(200).optional(),
@@ -332,10 +362,7 @@ export const updateEventSchema = z.object({
       telegram: z.string().trim().optional().or(z.literal('')),
     })
     .optional(),
-  regulationUrl: z.preprocess(
-    val => (val === '' ? null : val),
-    z.string().url('Regulation URL must be a valid URL').nullable().optional()
-  ),
+  regulationUrl: regulationUrlUpdate,
   scheduleText: z.string().max(5000).optional(),
   organizerInfo: z.string().trim().max(300).optional(),
   organizerContactName: z.string().trim().max(200).optional(),
