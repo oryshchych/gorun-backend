@@ -53,13 +53,18 @@ async function createPlataInvoice(params: {
   const webhookUrl =
     paymentConfig.webhookUrl || `http://localhost:${serverConfig.port}/api/webhooks/plata-mono`;
 
+  // Return the payer to a page that reconciles the payment status itself
+  // (via /sync-payment), so completion is confirmed even if the webhook is
+  // delayed or missed. The locale prefix is added by the frontend middleware.
+  const returnUrl = `${frontendConfig.url}/payment/return?registrationId=${registrationId}`;
+
   const body = {
     amount: amountInKopiykas,
     ccy: 980,
     merchantPaymInfo: {},
-    redirectUrl: `${frontendConfig.url}`,
-    successUrl: `${frontendConfig.url}?tab=participants`,
-    failUrl: `${frontendConfig.url}?tab=registration`,
+    redirectUrl: returnUrl,
+    successUrl: returnUrl,
+    failUrl: returnUrl,
     webHookUrl: webhookUrl,
     merchantData: {
       registrationId,

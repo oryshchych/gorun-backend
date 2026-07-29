@@ -7,14 +7,23 @@ import { logger } from '../../config/logger';
  */
 
 /**
- * Fetch public key from Monobank API for webhook signature verification
+ * Fetch public key from Monobank API for webhook signature verification.
+ * The key is cached in memory (it rarely changes); pass `forceRefresh` to
+ * re-fetch when a signature fails to verify against the cached key (rotation).
  * Documentation: https://monobank.ua/api-docs/acquiring/dev/webhooks/get--api--merchant--pubkey
  */
-export async function getPublicKey(): Promise<string | null> {
+let cachedPublicKey: string | null = null;
+
+export async function getPublicKey(forceRefresh = false): Promise<string | null> {
+  if (cachedPublicKey && !forceRefresh) return cachedPublicKey;
+
   if (!paymentConfig.plataApiKey) {
     logger.warn('Monobank API key not configured, cannot fetch public key');
     return null;
   }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
     const response = await fetch('https://api.monobank.ua/api/merchant/pubkey', {
@@ -22,6 +31,7 @@ export async function getPublicKey(): Promise<string | null> {
       headers: {
         'X-Token': paymentConfig.plataApiKey,
       },
+      signal: controller.signal,
     });
 
     if (!response.ok) {
@@ -32,10 +42,13 @@ export async function getPublicKey(): Promise<string | null> {
     }
 
     const data = (await response.json()) as { key?: string };
-    return data.key ?? null;
+    cachedPublicKey = data.key ?? null;
+    return cachedPublicKey;
   } catch (error) {
     logger.error('Error fetching Monobank public key', { error });
     return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

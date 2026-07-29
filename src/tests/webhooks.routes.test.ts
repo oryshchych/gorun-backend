@@ -11,6 +11,16 @@ jest.mock('../services/payments/payments.service', () => ({
   },
 }));
 
+// Signature verification consults Monobank for the merchant public key; stub it
+// to null so these tests deterministically fall back to the configured env key
+// (no network call).
+jest.mock('../services/monobank/monobank.service', () => ({
+  __esModule: true,
+  default: {
+    getPublicKey: jest.fn().mockResolvedValue(null),
+  },
+}));
+
 // Generate a real EC key pair for signature tests (done once, reused across tests)
 const { privateKey, publicKey } = crypto.generateKeyPairSync('ec', {
   namedCurve: 'prime256v1',

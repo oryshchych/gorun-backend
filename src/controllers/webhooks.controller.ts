@@ -4,41 +4,67 @@ import { eventConfig, frontendConfig, paymentConfig } from '../config/env';
 import { logger } from '../config/logger';
 import { Event } from '../models/Event';
 import emailService from '../services/email/email.service';
+import monobankService from '../services/monobank/monobank.service';
 import paymentsService from '../services/payments/payments.service';
 import registrationsService from '../services/registrations/registrations.service';
 import { plataWebhookSchema } from '../validators/webhooks.validator';
 
 /**
- * Verify webhook signature using ECDSA
+ * Verify an ECDSA/SHA256 webhook signature against a single base64-encoded key.
  * Documentation: https://monobank.ua/api-docs/acquiring/dev/webhooks/verify
  */
-const verifySignature = (rawBody: string, signatureHeader?: string): boolean => {
-  // No key configured — fail closed; never accept unverifiable webhooks
-  if (!paymentConfig.plataWebhookPublicKey) return false;
-  if (!signatureHeader) return false;
-
+export const verifyWithKey = (
+  rawBody: string,
+  signatureHeader: string,
+  keyBase64: string
+): boolean => {
   try {
-    // Decode base64 signature
     const signature = Buffer.from(signatureHeader, 'base64');
-
-    // Public key is base64-encoded PEM format
-    // Decode from base64 to get PEM string, then convert to Buffer
-    const publicKeyPem = Buffer.from(paymentConfig.plataWebhookPublicKey, 'base64').toString(
-      'utf-8'
-    );
-    const publicKeyBuffer = Buffer.from(publicKeyPem, 'utf-8');
-
-    // Create verify object
+    // Key is base64-encoded PEM: decode to the PEM string, then verify.
+    const publicKeyPem = Buffer.from(keyBase64, 'base64').toString('utf-8');
     const verify = crypto.createVerify('SHA256');
     verify.write(rawBody);
     verify.end();
-
-    // Verify signature using ECDSA public key
-    return verify.verify(publicKeyBuffer, signature);
+    return verify.verify(publicKeyPem, signature);
   } catch (error) {
-    logger.error('Webhook signature verification failed', { error });
+    logger.error('Webhook signature verification threw', { error });
     return false;
   }
+};
+
+/**
+ * Verify the webhook signature. The authoritative key is the one tied to the
+ * merchant token (fetched from Monobank and cached); the env key is only a
+ * fallback. Fails closed — an unverifiable webhook is always rejected.
+ */
+const verifySignature = async (rawBody: string, signatureHeader?: string): Promise<boolean> => {
+  if (!signatureHeader) return false;
+
+  // Primary: the merchant's current public key from Monobank (cached).
+  const fetchedKey = await monobankService.getPublicKey();
+  if (fetchedKey && verifyWithKey(rawBody, signatureHeader, fetchedKey)) {
+    return true;
+  }
+
+  // Fallback: a statically configured key, if any.
+  if (
+    paymentConfig.plataWebhookPublicKey &&
+    verifyWithKey(rawBody, signatureHeader, paymentConfig.plataWebhookPublicKey)
+  ) {
+    return true;
+  }
+
+  // The cached key may be stale (rotation) — refresh once and retry.
+  const refreshedKey = await monobankService.getPublicKey(true);
+  if (
+    refreshedKey &&
+    refreshedKey !== fetchedKey &&
+    verifyWithKey(rawBody, signatureHeader, refreshedKey)
+  ) {
+    return true;
+  }
+
+  return false;
 };
 
 export const handlePlataWebhook = async (req: Request, res: Response): Promise<void> => {
@@ -52,7 +78,7 @@ export const handlePlataWebhook = async (req: Request, res: Response): Promise<v
     status: (req.body as { status?: string })?.status,
   });
 
-  if (!verifySignature(rawBody, signatureHeader)) {
+  if (!(await verifySignature(rawBody, signatureHeader))) {
     logger.error('Webhook signature verification failed', {
       hasSignature: !!signatureHeader,
       invoiceId: (req.body as { invoiceId?: string })?.invoiceId,
