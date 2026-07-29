@@ -144,6 +144,26 @@ const regulationUrlUpdate = z.preprocess(
     .optional()
 );
 
+const consentLetterUrlCreate = z.preprocess(
+  val => (val === '' ? undefined : val),
+  z
+    .string()
+    .url({ message: 'Consent letter URL must be a valid URL' })
+    .refine(isPdfUrl, { message: 'Consent letter must be a PDF file' })
+    .optional()
+);
+
+/** Consent letter URL on UPDATE: empty string → null (clears the field). */
+const consentLetterUrlUpdate = z.preprocess(
+  val => (val === '' ? null : val),
+  z
+    .string()
+    .url({ message: 'Consent letter URL must be a valid URL' })
+    .refine(isPdfUrl, { message: 'Consent letter must be a PDF file' })
+    .nullable()
+    .optional()
+);
+
 /** Accepts a number, null, or empty string; empty string/null → null. */
 const optionalNumericOrEmpty = z.preprocess(
   val => (val === '' || val === null ? null : val),
@@ -295,6 +315,7 @@ export const createEventSchema = z.object({
     })
     .optional(),
   regulationUrl: regulationUrlCreate,
+  consentLetterUrl: consentLetterUrlCreate,
   scheduleText: z.string().max(5000).optional(),
   organizerInfo: z.string().trim().max(300).optional(),
   organizerContactName: z.string().trim().max(200).optional(),
@@ -363,6 +384,7 @@ export const updateEventSchema = z.object({
     })
     .optional(),
   regulationUrl: regulationUrlUpdate,
+  consentLetterUrl: consentLetterUrlUpdate,
   scheduleText: z.string().max(5000).optional(),
   organizerInfo: z.string().trim().max(300).optional(),
   organizerContactName: z.string().trim().max(200).optional(),

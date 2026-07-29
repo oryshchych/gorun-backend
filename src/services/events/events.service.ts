@@ -87,6 +87,7 @@ type EventDoc = {
   registrationEnd?: Date;
   socials?: { instagram?: string; facebook?: string; telegram?: string };
   regulationUrl?: string;
+  consentLetterUrl?: string;
   scheduleText?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -260,6 +261,7 @@ function formatEventResponse(event: EventDoc, lang?: 'en' | 'uk'): EventResponse
   if (event.registrationEnd !== undefined) response.registrationEnd = event.registrationEnd;
   if (event.socials !== undefined) response.socials = event.socials;
   if (event.regulationUrl !== undefined) response.regulationUrl = event.regulationUrl;
+  if (event.consentLetterUrl !== undefined) response.consentLetterUrl = event.consentLetterUrl;
   if (event.scheduleText !== undefined) response.scheduleText = event.scheduleText;
   return response;
 }
@@ -405,6 +407,9 @@ function mergeTranslationsForUpdate(
   if (input.socials !== undefined) updateFields.socials = input.socials;
   if (input.regulationUrl !== undefined && input.regulationUrl !== null) {
     updateFields.regulationUrl = input.regulationUrl;
+  }
+  if (input.consentLetterUrl !== undefined && input.consentLetterUrl !== null) {
+    updateFields.consentLetterUrl = input.consentLetterUrl;
   }
   if (input.scheduleText !== undefined) updateFields.scheduleText = input.scheduleText;
 
@@ -603,6 +608,7 @@ export async function createEvent(
     registrationEnd: input.registrationEnd,
     socials: input.socials,
     regulationUrl: input.regulationUrl,
+    consentLetterUrl: input.consentLetterUrl,
     scheduleText: input.scheduleText,
     organizerId: userId,
     registeredCount: 0,
@@ -644,6 +650,7 @@ export async function updateEvent(
   // missing/null fields (e.g. organizerId) we are not touching.
   const unsetFields: Record<string, 1> = {};
   if (input.regulationUrl === null) unsetFields['regulationUrl'] = 1;
+  if (input.consentLetterUrl === null) unsetFields['consentLetterUrl'] = 1;
 
   const updated = await Event.findByIdAndUpdate(
     id,

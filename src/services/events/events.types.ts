@@ -62,6 +62,7 @@ export interface CreateEventInput {
   registrationEnd?: Date;
   socials?: { instagram?: string; facebook?: string; telegram?: string };
   regulationUrl?: string;
+  consentLetterUrl?: string;
   scheduleText?: string;
   organizerInfo?: string;
   organizerContactName?: string;
@@ -110,6 +111,7 @@ export interface UpdateEventInput {
   registrationEnd?: Date;
   socials?: { instagram?: string; facebook?: string; telegram?: string };
   regulationUrl?: string | null;
+  consentLetterUrl?: string | null;
   scheduleText?: string;
   organizerInfo?: string;
   organizerContactName?: string;
@@ -188,6 +190,7 @@ export interface EventResponse {
   registrationEnd?: Date;
   socials?: { instagram?: string; facebook?: string; telegram?: string };
   regulationUrl?: string;
+  consentLetterUrl?: string;
   scheduleText?: string;
   organizerInfo?: string;
   organizerContactName?: string;

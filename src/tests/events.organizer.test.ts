@@ -122,6 +122,7 @@ describe('Event auxiliary fields (socials, regulationUrl, scheduleText, registra
     capacity: 50,
     socials: { instagram: 'https://instagram.com/run', facebook: '', telegram: 't.me/run' },
     regulationUrl: 'https://example.com/regulation.pdf',
+    consentLetterUrl: 'https://example.com/consent.pdf',
     scheduleText: 'Gates open at 8:00, start at 9:00',
     registrationStart: new Date('2098-01-01T00:00:00.000Z').toISOString(),
     registrationEnd: new Date('2098-12-31T00:00:00.000Z').toISOString(),
@@ -139,6 +140,7 @@ describe('Event auxiliary fields (socials, regulationUrl, scheduleText, registra
       telegram: 't.me/run',
     });
     expect(res.body.data.regulationUrl).toBe('https://example.com/regulation.pdf');
+    expect(res.body.data.consentLetterUrl).toBe('https://example.com/consent.pdf');
     expect(res.body.data.scheduleText).toBe('Gates open at 8:00, start at 9:00');
     expect(res.body.data.registrationStart).toBeDefined();
     expect(res.body.data.registrationEnd).toBeDefined();
@@ -175,6 +177,40 @@ describe('Event auxiliary fields (socials, regulationUrl, scheduleText, registra
       .set('Authorization', auth)
       .send({ ...baseBody, regulationUrl: 'https://example.com/regulation.docx' })
       .expect(400);
+  });
+
+  it('updates and clears consentLetterUrl, and rejects a non-PDF value', async () => {
+    const created = await request(app)
+      .post('/api/events')
+      .set('Authorization', auth)
+      .send(baseBody)
+      .expect(201);
+    const { id } = created.body.data;
+
+    // Non-PDF is rejected
+    await request(app)
+      .put(`/api/events/${id}`)
+      .set('Authorization', auth)
+      .send({ consentLetterUrl: 'https://example.com/consent.docx' })
+      .expect(400);
+
+    // Valid PDF round-trips through GET
+    await request(app)
+      .put(`/api/events/${id}`)
+      .set('Authorization', auth)
+      .send({ consentLetterUrl: 'https://example.com/consent-v2.pdf' })
+      .expect(200);
+    let getRes = await request(app).get(`/api/events/${id}`).expect(200);
+    expect(getRes.body.data.consentLetterUrl).toBe('https://example.com/consent-v2.pdf');
+
+    // Empty string clears it
+    await request(app)
+      .put(`/api/events/${id}`)
+      .set('Authorization', auth)
+      .send({ consentLetterUrl: '' })
+      .expect(200);
+    getRes = await request(app).get(`/api/events/${id}`).expect(200);
+    expect(getRes.body.data.consentLetterUrl).toBeUndefined();
   });
 
   it('clears regulationUrl when an empty string is sent on update', async () => {

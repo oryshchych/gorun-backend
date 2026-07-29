@@ -148,6 +148,7 @@ export interface IEvent extends Document {
     telegram?: string;
   };
   regulationUrl?: string;
+  consentLetterUrl?: string;
   scheduleText?: string;
   organizerInfo?: string;
   organizerContactName?: string;
@@ -495,6 +496,7 @@ const eventSchema = new Schema<IEvent>(
       default: undefined,
     },
     regulationUrl: { type: String, trim: true },
+    consentLetterUrl: { type: String, trim: true },
     scheduleText: { type: String },
     organizerInfo: { type: String, trim: true },
     organizerContactName: { type: String, trim: true },
