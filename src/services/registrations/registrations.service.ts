@@ -10,7 +10,7 @@ import {
   formatPaginatedResponse,
   getPaginationParams,
 } from '../../utils/pagination.util';
-import { calculatePrice } from '../../utils/pricing.util';
+import { calculateRegistrationPrice } from '../../utils/pricing.util';
 import emailService from '../email/email.service';
 import monobankService from '../monobank/monobank.service';
 import paymentsService from '../payments/payments.service';
@@ -325,8 +325,16 @@ export async function createPublicRegistration(
           ? await promoCodesService.validate(promoCode, resolvedEventId)
           : null;
 
-        const basePrice = event.basePrice ?? eventConfig.basePrice;
-        if (basePrice === undefined) {
+        const priceBreakdown = calculateRegistrationPrice({
+          distances: event.distances,
+          kidsDistances: event.kidsDistances,
+          distanceId,
+          kidsRegistrations,
+          afuDonation,
+          basePrice: event.basePrice ?? eventConfig.basePrice,
+          promoCode: validatedPromo,
+        });
+        if (!priceBreakdown) {
           await session.abortTransaction();
           session.endSession();
           throw new ConflictError(
@@ -335,7 +343,7 @@ export async function createPublicRegistration(
           );
         }
 
-        const { finalPrice, discountAmount } = calculatePrice(basePrice, validatedPromo);
+        const { finalPrice, discountAmount, subtotal } = priceBreakdown;
 
         // Special case: If new registration is free (100% discount), cancel previous payment and confirm registration
         if (finalPrice === 0) {
@@ -404,7 +412,7 @@ export async function createPublicRegistration(
               paymentAmount: 0,
               paymentCurrency: paymentConfig.currency,
               registrationId: existing._id.toString(),
-              basePrice,
+              basePrice: subtotal,
             };
 
             if (discountAmount > 0) {
@@ -522,15 +530,23 @@ export async function createPublicRegistration(
       ? await promoCodesService.validate(promoCode, resolvedEventId)
       : null;
 
-    const basePrice = event.basePrice ?? eventConfig.basePrice;
-    if (basePrice === undefined) {
+    const priceBreakdown = calculateRegistrationPrice({
+      distances: event.distances,
+      kidsDistances: event.kidsDistances,
+      distanceId,
+      kidsRegistrations,
+      afuDonation,
+      basePrice: event.basePrice ?? eventConfig.basePrice,
+      promoCode: validatedPromo,
+    });
+    if (!priceBreakdown) {
       throw new ConflictError(
         'Event price is not configured',
         REGISTRATIONS_CODES.ERROR_REGISTRATION_PRICE_NOT_CONFIGURED
       );
     }
 
-    const { finalPrice, discountAmount } = calculatePrice(basePrice, validatedPromo);
+    const { finalPrice, discountAmount, subtotal } = priceBreakdown;
 
     // Validate final price
     if (!isFinite(finalPrice) || finalPrice < 0) {
@@ -598,7 +614,7 @@ export async function createPublicRegistration(
           paymentAmount: 0,
           paymentCurrency: paymentConfig.currency,
           registrationId: registration._id.toString(),
-          basePrice,
+          basePrice: subtotal,
         };
 
         if (discountAmount > 0) {
@@ -643,7 +659,7 @@ export async function createPublicRegistration(
         paymentCurrency: paymentConfig.currency,
         paymentLink,
         registrationId: registration._id.toString(),
-        basePrice,
+        basePrice: subtotal,
       };
 
       if (discountAmount > 0) {
