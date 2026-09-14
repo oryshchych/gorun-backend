@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { eventConfig } from '../../config/env';
 import { Event, IEvent, Speaker } from '../../models/Event';
 import { Registration } from '../../models/Registration';
+import { User } from '../../models/User';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../types/errors';
 import {
   PaginatedResponse,
@@ -723,7 +724,7 @@ export async function getMyEvents(
 export async function checkUserRegistration(
   eventId: string,
   userId: string
-): Promise<{ isRegistered: boolean }> {
+): Promise<{ isRegistered: boolean; distanceIds: string[] }> {
   if (!mongoose.Types.ObjectId.isValid(eventId)) {
     throw new NotFoundError('Invalid event ID');
   }
@@ -733,14 +734,33 @@ export async function checkUserRegistration(
     throw new NotFoundError('Event not found');
   }
 
-  const registration = await Registration.findOne({
+  // Match by userId AND by the account e-mail: public (wizard) registrations are
+  // keyed by e-mail with no userId, so a userId-only match would miss them.
+  const user = await User.findById(userId).select('email').lean();
+  const ownerConditions: Record<string, unknown>[] = [{ userId }];
+  if (user?.email) {
+    ownerConditions.push({ email: user.email.toLowerCase() });
+  }
+
+  const registrations = await Registration.find({
     eventId,
-    userId,
     status: 'confirmed',
-  });
+    $or: ownerConditions,
+  })
+    .select('distanceId')
+    .lean();
+
+  const distanceIds = [
+    ...new Set(
+      registrations
+        .map(reg => reg.distanceId)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0)
+    ),
+  ];
 
   return {
-    isRegistered: !!registration,
+    isRegistered: registrations.length > 0,
+    distanceIds,
   };
 }
 
