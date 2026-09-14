@@ -44,6 +44,11 @@ export const createPublicRegistrationSchema = z.object({
   promoCode: z.string().max(50, { message: 'Promo code must not exceed 50 characters' }).optional(),
   distanceId: z.string().optional(),
   distanceLabel: z.string().optional(),
+  gender: z.enum(['female', 'male', 'other', 'prefer_not_to_say']).optional(),
+  dateOfBirth: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'dateOfBirth must be YYYY-MM-DD' })
+    .optional(),
   shirtSize: z.string().optional(),
   estimatedPace: z.string().optional(),
   afuDonation: z.number().min(0).optional(),

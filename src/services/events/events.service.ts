@@ -187,6 +187,59 @@ function resolveByLang(
   return result;
 }
 
+/**
+ * Populate each distance's `spots.taken` with the authoritative count of
+ * confirmed registrations for that distance. The stored value is never kept up
+ * to date, so we recompute it on read (one aggregate for the whole batch).
+ * Mutates the passed lean event docs in place before they are formatted.
+ */
+async function populateDistanceSpots(events: EventDoc[]): Promise<void> {
+  const withDistances = events.filter(e => e.distances && e.distances.length > 0);
+  if (withDistances.length === 0) return;
+
+  const ids = withDistances.map(e => new mongoose.Types.ObjectId(e._id.toString()));
+
+  const rows = await Registration.aggregate<{
+    _id: { eventId: mongoose.Types.ObjectId; distanceId: string };
+    count: number;
+  }>([
+    {
+      $match: {
+        eventId: { $in: ids },
+        status: 'confirmed',
+        distanceId: { $type: 'string', $ne: '' },
+      },
+    },
+    {
+      $group: {
+        _id: { eventId: '$eventId', distanceId: '$distanceId' },
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const countsByEvent = new Map<string, Map<string, number>>();
+  for (const row of rows) {
+    const eventId = row._id.eventId.toString();
+    let perDistance = countsByEvent.get(eventId);
+    if (!perDistance) {
+      perDistance = new Map();
+      countsByEvent.set(eventId, perDistance);
+    }
+    perDistance.set(row._id.distanceId, row.count);
+  }
+
+  for (const event of withDistances) {
+    const perDistance = countsByEvent.get(event._id.toString());
+    for (const distance of event.distances ?? []) {
+      if (!distance.id) continue;
+      const taken = perDistance?.get(distance.id) ?? 0;
+      const total = distance.spots?.total ?? distance.participantLimit;
+      distance.spots = total === undefined ? { taken } : { taken, total };
+    }
+  }
+}
+
 function formatEventResponse(event: EventDoc, lang?: 'en' | 'uk'): EventResponse {
   const translations = buildTranslations(event);
   const resolved = resolveByLang(translations, lang);
@@ -509,6 +562,8 @@ export async function getEvents(
     .limit(parsedLimit)
     .lean();
 
+  await populateDistanceSpots(events);
+
   const eventResponses = events.map((event: EventDoc) => formatEventResponse(event, lang));
 
   return formatPaginatedResponse(eventResponses, total, parsedPage, parsedLimit);
@@ -528,6 +583,8 @@ export async function getSingleEvent(lang?: 'en' | 'uk'): Promise<EventResponse>
   if (!event) {
     throw new NotFoundError('Event not found');
   }
+
+  await populateDistanceSpots([event]);
 
   return formatEventResponse(event, lang);
 }
@@ -551,6 +608,8 @@ export async function getEventById(
   if (!event) {
     throw new NotFoundError('Event not found');
   }
+
+  await populateDistanceSpots([event as EventDoc]);
 
   return formatEventResponse(event as EventDoc, lang);
 }
@@ -715,6 +774,8 @@ export async function getMyEvents(
     .skip(skip)
     .limit(parsedLimit)
     .lean();
+
+  await populateDistanceSpots(events);
 
   const eventResponses = events.map((event: EventDoc) => formatEventResponse(event));
 

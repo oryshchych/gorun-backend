@@ -18,6 +18,9 @@ export interface CreatePublicRegistrationInput {
   promoCode?: string;
   distanceId?: string;
   distanceLabel?: string;
+  gender?: string;
+  /** ISO date-only YYYY-MM-DD */
+  dateOfBirth?: string;
   shirtSize?: string;
   estimatedPace?: string;
   afuDonation?: number;
@@ -90,5 +93,11 @@ export interface PublicParticipant {
   runningClub?: string;
   registeredAt: Date;
   bib?: string | null;
+  /** Human-readable distance label, e.g. "21K". */
   distance?: string;
+  /** Distance id, for grouping/counting per distance. */
+  distanceId?: string;
+  gender?: string;
+  /** Age in years, derived from the registrant's date of birth. */
+  age?: number;
 }

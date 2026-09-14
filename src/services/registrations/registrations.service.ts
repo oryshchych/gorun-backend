@@ -278,6 +278,8 @@ export async function createPublicRegistration(
     promoCode,
     distanceId,
     distanceLabel,
+    gender,
+    dateOfBirth,
     shirtSize,
     estimatedPace,
     afuDonation,
@@ -579,6 +581,8 @@ export async function createPublicRegistration(
           finalPrice,
           distanceId,
           distanceLabel,
+          gender,
+          dateOfBirth,
           shirtSize,
           estimatedPace,
           afuDonation,
@@ -1032,7 +1036,9 @@ export async function getPublicParticipants(eventId: string): Promise<PublicPart
     eventId: resolvedEventId,
     status: 'confirmed',
   })
-    .select('name surname city runningClub registeredAt bib distanceLabel')
+    .select(
+      'name surname city runningClub registeredAt bib distanceId distanceLabel gender dateOfBirth'
+    )
     .sort({ registeredAt: -1 })
     .lean();
 
@@ -1048,8 +1054,26 @@ export async function getPublicParticipants(eventId: string): Promise<PublicPart
     record.bib = (participant as { bib?: string }).bib ?? null;
     const dl = (participant as { distanceLabel?: string }).distanceLabel;
     if (dl !== undefined) record.distance = dl;
+    if (participant.distanceId !== undefined) record.distanceId = participant.distanceId;
+    if (participant.gender !== undefined) record.gender = participant.gender;
+    const age = ageFromDateOfBirth(participant.dateOfBirth);
+    if (age !== undefined) record.age = age;
     return record;
   });
+}
+
+/** Whole-years age from an ISO date-only (YYYY-MM-DD) string, or undefined. */
+function ageFromDateOfBirth(dateOfBirth?: string): number | undefined {
+  if (!dateOfBirth) return undefined;
+  const dob = new Date(dateOfBirth);
+  if (Number.isNaN(dob.getTime())) return undefined;
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const monthDiff = now.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) {
+    age -= 1;
+  }
+  return age >= 0 && age < 150 ? age : undefined;
 }
 
 /**

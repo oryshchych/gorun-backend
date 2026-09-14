@@ -28,6 +28,9 @@ export interface IRegistration extends Document {
   finalPrice?: number;
   distanceId?: string;
   distanceLabel?: string;
+  gender?: string;
+  /** ISO date-only YYYY-MM-DD */
+  dateOfBirth?: string;
   shirtSize?: string;
   estimatedPace?: string;
   afuDonation?: number;
@@ -132,6 +135,16 @@ const registrationSchema = new Schema<IRegistration>(
     },
     distanceId: { type: String, trim: true },
     distanceLabel: { type: String, trim: true },
+    gender: {
+      type: String,
+      enum: ['female', 'male', 'other', 'prefer_not_to_say'],
+    },
+    // ISO date-only (YYYY-MM-DD); snapshot of the registrant's DOB.
+    dateOfBirth: {
+      type: String,
+      trim: true,
+      match: [/^\d{4}-\d{2}-\d{2}$/, 'dateOfBirth must be YYYY-MM-DD'],
+    },
     shirtSize: { type: String, trim: true },
     estimatedPace: { type: String, trim: true },
     afuDonation: { type: Number, min: 0 },
