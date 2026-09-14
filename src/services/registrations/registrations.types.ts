@@ -22,6 +22,8 @@ export interface CreatePublicRegistrationInput {
   estimatedPace?: string;
   afuDonation?: number;
   kidsRegistrations?: KidRegistration[];
+  /** UI locale the user registered in, forwarded to the payment return URL. */
+  locale?: string;
 }
 
 export interface RegistrationFilters {

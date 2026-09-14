@@ -59,6 +59,8 @@ export const createPublicRegistrationSchema = z.object({
       })
     )
     .optional(),
+  // UI locale — restricted so it can safely become a URL path segment.
+  locale: z.enum(['uk', 'en']).optional(),
 });
 
 export const registrationIdSchema = z.object({

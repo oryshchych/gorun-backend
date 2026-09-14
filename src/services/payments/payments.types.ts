@@ -5,6 +5,8 @@ export interface CreatePaymentParams {
   amount: number;
   customerName: string;
   eventTitle: string;
+  /** UI locale the user registered in, used to localize the return URL. */
+  locale?: string | undefined;
   session?: mongoose.ClientSession;
 }
 

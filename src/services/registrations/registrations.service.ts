@@ -282,6 +282,7 @@ export async function createPublicRegistration(
     estimatedPace,
     afuDonation,
     kidsRegistrations,
+    locale,
   } = input;
   const resolvedEventId = resolveEventId(eventId);
 
@@ -500,6 +501,7 @@ export async function createPublicRegistration(
                 amount: finalPrice,
                 customerName: `${name} ${surname}`.trim(),
                 eventTitle: event.title,
+                locale,
                 session: newSession,
               });
 
@@ -639,6 +641,7 @@ export async function createPublicRegistration(
       amount: finalPrice,
       customerName: `${name} ${surname}`.trim(),
       eventTitle: event.title,
+      locale,
       session,
     });
 
@@ -768,6 +771,7 @@ export async function createPublicRegistration(
                           `${duplicateRegistration.name ?? ''} ${duplicateRegistration.surname ?? ''}`.trim() ||
                           'Participant',
                         eventTitle: event.title,
+                        locale,
                         session: newSession,
                       });
 

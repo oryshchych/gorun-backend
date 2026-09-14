@@ -7,6 +7,21 @@ import { AppError } from '../../types/errors';
 import monobankService from '../monobank/monobank.service';
 import type { CreatePaymentParams, PlataInvoiceResponse } from './payments.types';
 
+/** Locales the frontend serves; used to build a localized return URL. */
+const SUPPORTED_LOCALES = ['uk', 'en'] as const;
+
+/**
+ * Build the post-payment return URL, carrying the locale the user registered in
+ * so the return page renders in the same language (not the browser default).
+ * The locale is validated against the supported set — it goes into a URL path,
+ * so an unexpected value is dropped rather than injected.
+ */
+export function buildPaymentReturnUrl(registrationId: string, locale?: string): string {
+  const segment =
+    locale && (SUPPORTED_LOCALES as readonly string[]).includes(locale) ? `/${locale}` : '';
+  return `${frontendConfig.url}${segment}/payment/return?registrationId=${registrationId}`;
+}
+
 /**
  * Call Monobank API to create an invoice
  * Documentation: https://monobank.ua/api-docs/acquiring/methods/ia/post--api--merchant--invoice--create
@@ -16,8 +31,9 @@ async function createPlataInvoice(params: {
   customerName: string;
   eventTitle: string;
   registrationId: string;
+  locale?: string | undefined;
 }): Promise<PlataInvoiceResponse> {
-  const { amount, customerName, eventTitle, registrationId } = params;
+  const { amount, customerName, eventTitle, registrationId, locale } = params;
 
   if (!amount || amount <= 0 || !isFinite(amount)) {
     logger.error('Invalid amount for Monobank invoice', {
@@ -55,8 +71,8 @@ async function createPlataInvoice(params: {
 
   // Return the payer to a page that reconciles the payment status itself
   // (via /sync-payment), so completion is confirmed even if the webhook is
-  // delayed or missed. The locale prefix is added by the frontend middleware.
-  const returnUrl = `${frontendConfig.url}/payment/return?registrationId=${registrationId}`;
+  // delayed or missed. Carry the registration locale so the page matches it.
+  const returnUrl = buildPaymentReturnUrl(registrationId, locale);
 
   const body = {
     amount: amountInKopiykas,
@@ -207,6 +223,7 @@ export async function createPaymentWithInvoice({
   amount,
   customerName,
   eventTitle,
+  locale,
   session,
 }: CreatePaymentParams): Promise<{ payment: IPayment; paymentLink?: string }> {
   if (!paymentConfig.plataApiKey) {
@@ -239,6 +256,7 @@ export async function createPaymentWithInvoice({
     customerName,
     eventTitle,
     registrationId,
+    locale,
   });
 
   if (invoice.invoiceId) {
