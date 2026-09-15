@@ -127,11 +127,25 @@ export const handlePlataWebhook = async (req: Request, res: Response): Promise<v
     newStatus: payload.status,
   });
 
-  // Monobank statuses: 'created', 'processing', 'success', 'failure', 'expired', 'hold'
-  // Only 'success' means payment is completed
+  // Monobank statuses: 'created', 'processing', 'success', 'failure', 'expired', 'hold'.
+  // Only terminal statuses change state. Intermediate ones ('created',
+  // 'processing', 'hold', or missing) are sent BEFORE the final result — treating
+  // them as failures wrongly fails the payment and e-mails the user.
   const isSuccess = payload.status === 'success';
+  const isFailure = payload.status === 'failure' || payload.status === 'expired';
 
-  // Skip processing if payment is already in the target state
+  // Non-terminal status → acknowledge and wait for the final webhook.
+  if (!isSuccess && !isFailure) {
+    logger.info('Ignoring non-terminal payment status', {
+      paymentId: payment._id.toString(),
+      invoiceId,
+      status: payload.status,
+    });
+    res.status(200).json({ success: true, message: 'Status acknowledged' });
+    return;
+  }
+
+  // Skip processing if payment is already in the target terminal state.
   if (isSuccess && payment.status === 'completed') {
     logger.info('Payment already completed, skipping webhook processing', {
       paymentId: payment._id.toString(),
@@ -141,7 +155,7 @@ export const handlePlataWebhook = async (req: Request, res: Response): Promise<v
     return;
   }
 
-  if (!isSuccess && payment.status === 'failed') {
+  if (isFailure && payment.status === 'failed') {
     logger.info('Payment already marked as failed, skipping webhook processing', {
       paymentId: payment._id.toString(),
       invoiceId,
@@ -197,7 +211,7 @@ export const handlePlataWebhook = async (req: Request, res: Response): Promise<v
       }
 
       void emailService.sendRegistrationConfirmation(emailParams);
-    } else if (!isSuccess && registration.email && event) {
+    } else if (isFailure && registration.email && event) {
       const retryLink = `${frontendConfig.failureUrl}?registrationId=${registration.id}`;
       void emailService.sendPaymentFailed({
         to: registration.email,

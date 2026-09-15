@@ -1345,8 +1345,10 @@ export async function syncPaymentStatus(registrationId: string): Promise<{
     };
   }
 
-  // If status is failure and payment is not already failed
-  if (monobankStatus === 'failure' && payment.status !== 'failed') {
+  // Only terminal-failure statuses fail the payment; intermediate ones are
+  // left pending (consistent with the webhook handler).
+  const isFailure = monobankStatus === 'failure' || monobankStatus === 'expired';
+  if (isFailure && payment.status !== 'failed') {
     await markPaymentFailed(payment, statusData as Record<string, unknown>);
 
     const updatedRegistration = await Registration.findById(registrationId);
